@@ -79,7 +79,8 @@ function MacroProvider({ children }: MacroProviderProps) {
         (element): element is MouseEventAction =>
           element.type === 'MouseEventAction'
       )
-      .map((element: MouseEventAction) => element.data.data.button)
+      .filter((element: MouseEventAction) => element.data.type === 'Press')
+      .map((element: MouseEventAction) => element.data.type === 'Press' ? element.data.data.button : undefined)
   }, [sequence])
 
   const willCauseTriggerLooping = useMemo(() => {

@@ -79,7 +79,11 @@ export type KeyPressEventAction = {
   type: 'KeyPressEventAction'
   data: Keypress
 }
-export type DelayEventAction = { type: 'DelayEventAction'; data: number }
+export type DelayEventAction = {
+  type: 'DelayEventAction'
+  data: number
+  random_max?: number
+}
 export type SystemEventAction = {
   type: 'SystemEventAction'
   data: SystemAction
@@ -162,7 +166,9 @@ export type MousePressAction =
   | { type: 'Up'; button: MouseButton }
   | { type: 'DownUp'; button: MouseButton; duration: number }
 
-export type MouseAction = { type: 'Press'; data: MousePressAction }
+export type MouseAction =
+  | { type: 'Press'; data: MousePressAction }
+  | { type: 'Move'; x: number; y: number }
 
 export type SystemAction =
   | { type: 'Open'; action: DirectoryAction }

@@ -1,10 +1,13 @@
 import {
   Button,
   Divider,
+  FormControl,
+  FormLabel,
   Grid,
   GridItem,
   HStack,
   Input,
+  Switch,
   Text,
   useColorModeValue,
   useToast,
@@ -31,6 +34,8 @@ export default function DelayForm({
   const [delayDuration, setDelayDuration] = useState(
     config.config.DefaultDelayValue
   )
+  const [isRandom, setIsRandom] = useState(false)
+  const [randomMax, setRandomMax] = useState(config.config.DefaultDelayValue)
   const { updateElement } = useMacroContext()
   const bg = useColorModeValue('primary-light.50', 'primary-dark.700')
   const kebabColour = useColorModeValue('primary-light.500', 'primary-dark.500')
@@ -44,6 +49,13 @@ export default function DelayForm({
       return
 
     setDelayDuration(selectedElement.data)
+    if (selectedElement.random_max !== undefined) {
+      setIsRandom(true)
+      setRandomMax(selectedElement.random_max)
+    } else {
+      setIsRandom(false)
+      setRandomMax(selectedElement.data)
+    }
   }, [selectedElement])
 
   const onDelayDurationChange = useCallback(
@@ -51,6 +63,13 @@ export default function DelayForm({
       setDelayDuration(Number(event.target.value))
     },
     [setDelayDuration]
+  )
+
+  const onRandomMaxChange = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      setRandomMax(Number(event.target.value))
+    },
+    [setRandomMax]
   )
 
   const onInputBlur = useCallback(() => {
@@ -69,12 +88,80 @@ export default function DelayForm({
       return
     }
 
+    let max = randomMax
+    if (isRandom && randomMax <= duration) {
+      max = duration + 1
+      setRandomMax(max)
+    }
+
     const temp: DelayEventAction = {
       ...selectedElement,
-      data: duration
+      data: duration,
+      random_max: isRandom ? max : undefined
     }
     updateElement(temp, selectedElementId)
-  }, [delayDuration, selectedElement, selectedElementId, toast, updateElement])
+  }, [
+    delayDuration,
+    isRandom,
+    randomMax,
+    selectedElement,
+    selectedElementId,
+    toast,
+    updateElement
+  ])
+
+  const onRandomMaxBlur = useCallback(() => {
+    if (Number.isNaN(randomMax)) return
+
+    let max = randomMax
+    if (max <= delayDuration) {
+      max = delayDuration + 1
+      setRandomMax(max)
+      toast({
+        title: 'Max adjusted',
+        description: 'Max must be greater than min',
+        status: 'info',
+        duration: 3000,
+        isClosable: true
+      })
+    }
+
+    const temp: DelayEventAction = {
+      ...selectedElement,
+      data: delayDuration,
+      random_max: max
+    }
+    updateElement(temp, selectedElementId)
+  }, [
+    randomMax,
+    delayDuration,
+    selectedElement,
+    selectedElementId,
+    toast,
+    updateElement
+  ])
+
+  const onRandomToggle = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const checked = event.target.checked
+      setIsRandom(checked)
+      const newMax = checked ? Math.max(randomMax, delayDuration + 1) : undefined
+      if (checked) setRandomMax(newMax!)
+      const temp: DelayEventAction = {
+        ...selectedElement,
+        data: delayDuration,
+        random_max: newMax
+      }
+      updateElement(temp, selectedElementId)
+    },
+    [
+      delayDuration,
+      randomMax,
+      selectedElement,
+      selectedElementId,
+      updateElement
+    ]
+  )
 
   const onResetClick = useCallback(() => {
     toast({
@@ -85,9 +172,11 @@ export default function DelayForm({
       isClosable: true
     })
     setDelayDuration(config.config.DefaultDelayValue)
+    setIsRandom(false)
     const temp: DelayEventAction = {
       ...selectedElement,
-      data: config.config.DefaultDelayValue
+      data: config.config.DefaultDelayValue,
+      random_max: undefined
     }
     updateElement(temp, selectedElementId)
   }, [
@@ -106,7 +195,9 @@ export default function DelayForm({
       <Divider />
       <Grid templateRows="20px 1fr" gap="2" w="full">
         <GridItem w="full" h="8px" alignItems="center" justifyContent="center">
-          <Text fontSize={['xs', 'sm', 'md']}>Duration (ms)</Text>
+          <Text fontSize={['xs', 'sm', 'md']}>
+            {isRandom ? 'Min (ms)' : 'Duration (ms)'}
+          </Text>
         </GridItem>
         <VStack w="full">
           <Input
@@ -118,6 +209,31 @@ export default function DelayForm({
             onBlur={onInputBlur}
             isInvalid={Number.isNaN(delayDuration)}
           />
+          {isRandom && (
+            <>
+              <Text fontSize={['xs', 'sm', 'md']} alignSelf="flex-start">
+                Max (ms)
+              </Text>
+              <Input
+                type="number"
+                variant="brandAccent"
+                value={randomMax}
+                onChange={onRandomMaxChange}
+                onBlur={onRandomMaxBlur}
+                isInvalid={Number.isNaN(randomMax) || randomMax <= delayDuration}
+              />
+            </>
+          )}
+          <FormControl display="flex" alignItems="center" pt={1}>
+            <FormLabel mb="0" fontSize={['xs', 'sm', 'md']}>
+              Random range
+            </FormLabel>
+            <Switch
+              isChecked={isRandom}
+              onChange={onRandomToggle}
+              colorScheme="yellow"
+            />
+          </FormControl>
           <Button
             variant="brandTertiary"
             leftIcon={<ResetDefaultIcon />}

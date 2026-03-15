@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::{thread, time};
 
 use anyhow::{bail, Error, Result};
+use fastrand;
 #[cfg(not(debug_assertions))]
 use dirs;
 use halfbrown::HashMap;
@@ -76,6 +77,8 @@ pub enum ActionEventType {
     //IDEA: Sending a message through online webapi (twitch)
     DelayEventAction {
         data: delay::Delay,
+        #[serde(default)]
+        random_max: Option<u64>,
     },
 }
 
@@ -146,8 +149,12 @@ impl Macro {
                 ActionEventType::PhillipsHueEventAction { .. } => {}
                 ActionEventType::OBSEventAction { .. } => {}
                 ActionEventType::DiscordEventAction { .. } => {}
-                ActionEventType::DelayEventAction { data } => {
-                    tokio::time::sleep(time::Duration::from_millis(*data)).await;
+                ActionEventType::DelayEventAction { data, random_max } => {
+                    let actual_delay = match random_max {
+                        Some(max) if *max > *data => fastrand::u64(*data..=*max),
+                        _ => *data,
+                    };
+                    tokio::time::sleep(time::Duration::from_millis(actual_delay)).await;
                 }
 
                 ActionEventType::SystemEventAction { data } => {

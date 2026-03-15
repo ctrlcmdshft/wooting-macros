@@ -95,6 +95,9 @@ export const getElementDisplayString = (element: ActionEventType): string => {
     case 'DelayEventAction':
       return element.data.toString() + ' ms'
     case 'MouseEventAction':
+      if (element.data.type === 'Move') {
+        return `Mouse Move (${element.data.x}, ${element.data.y})`
+      }
       return (
         mouseEnumLookup.get(element.data.data.button)?.displayString || 'error'
       )

@@ -17,6 +17,66 @@ export default function PatchNotesPanel() {
   return (
     <VStack w="full" spacing={4}>
       <Text w="full" fontWeight="bold" fontSize="sm">
+        March 2026, v. 1.1.2-beta
+      </Text>
+      <VStack w="full">
+        <Heading w="full" size="lg" textColor={whatsNewTextColour}>
+          What's New
+        </Heading>
+        <UnorderedList
+          w="full"
+          px="8"
+          spacing={2}
+          textColor={textColour}
+          fontWeight="semibold"
+        >
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Dynamic delay.&nbsp;
+            </Text>
+            Delay elements now support a random range — set a min and max and
+            each run picks a random value in between for more natural timing.
+          </ListItem>
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Mouse move action.&nbsp;
+            </Text>
+            New Mouse Move element in the sequence editor — moves the cursor to
+            an absolute screen position.
+          </ListItem>
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Auto-delay toggle.&nbsp;
+            </Text>
+            Auto-add delay can now be toggled directly in the sequence editor
+            toolbar — no need to go into Settings.
+          </ListItem>
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Bug fix.&nbsp;
+            </Text>
+            Fixed patch notes showing "Right-click" — the three-dot menu is
+            left-clicked, not right-clicked.
+          </ListItem>
+        </UnorderedList>
+      </VStack>
+      <Text w="full" fontWeight="bold" fontSize="sm">
         March 2026, v. 1.1.1-beta
       </Text>
       <VStack w="full">
@@ -49,7 +109,7 @@ export default function PatchNotesPanel() {
             >
               Copy macro to collection.&nbsp;
             </Text>
-            Right-click any macro card to copy it to another collection.
+            Click the three-dot menu on any macro card to copy it to another collection.
           </ListItem>
           <ListItem>
             <Text

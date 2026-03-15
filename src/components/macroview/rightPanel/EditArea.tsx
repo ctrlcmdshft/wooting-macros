@@ -6,6 +6,7 @@ import useMainBgColour from '../../../hooks/useMainBgColour'
 import DelayForm from './editForms/DelayForm'
 import EmptyForm from './editForms/EmptyForm'
 import KeyPressForm from './editForms/KeyPressForm'
+import MouseMoveForm from './editForms/MouseMoveForm'
 import MousePressForm from './editForms/MousePressForm'
 import SystemEventActionForm from './editForms/SystemEventActionForm'
 
@@ -71,6 +72,14 @@ export default function EditArea() {
           />
         )
       case 'MouseEventAction':
+        if (selectedElement.data.type === 'Move') {
+          return (
+            <MouseMoveForm
+              selectedElementId={selectedElementId}
+              selectedElement={selectedElement}
+            />
+          )
+        }
         return (
           <MousePressForm
             selectedElementId={selectedElementId}

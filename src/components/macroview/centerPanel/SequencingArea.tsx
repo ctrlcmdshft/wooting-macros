@@ -38,7 +38,7 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
     onElementsAdd,
     updateElement
   } = useMacroContext()
-  const { config } = useSettingsContext()
+  const { config, updateAutoAddDelay } = useSettingsContext()
   const { isOpen, onOpen, onClose } = useDisclosure()
   const { appDebugMode } = useApplicationContext()
 
@@ -172,6 +172,24 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         >
           {recording ? 'Stop' : 'Record'}
         </Button>
+        <Tooltip
+          label={`Auto-add delay while recording: ${config.AutoAddDelay ? 'On' : 'Off'}`}
+          hasArrow
+          variant="brand"
+        >
+          <Button
+            leftIcon={<TimeIcon />}
+            size={['xs', 'sm', 'md']}
+            fontSize={['xs', 'xs', 'lg']}
+            bg={config.AutoAddDelay ? 'yellow.300' : undefined}
+            color={config.AutoAddDelay ? 'gray.800' : undefined}
+            variant={config.AutoAddDelay ? undefined : 'brandRecord'}
+            _hover={{ bg: config.AutoAddDelay ? 'yellow.400' : undefined }}
+            onClick={() => updateAutoAddDelay(!config.AutoAddDelay)}
+          >
+            Auto Delay
+          </Button>
+        </Tooltip>
         <Button
           variant="brandRecord"
           leftIcon={<TimeIcon />}

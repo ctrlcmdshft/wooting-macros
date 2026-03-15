@@ -41,17 +41,17 @@ export default function MousePressForm({
   const toast = useToast()
 
   useEffect(() => {
-    const typeString: keyof typeof KeyType = selectedElement.data.data
-      .type as keyof typeof KeyType
+    if (selectedElement.data.type !== 'Press') return
+    const pressData = selectedElement.data.data
+    const typeString: keyof typeof KeyType = pressData.type as keyof typeof KeyType
     setMousepressType(KeyType[typeString])
-    if (selectedElement.data.data.type === 'DownUp') {
-      setMousepressDuration(selectedElement.data.data.duration)
+    if (pressData.type === 'DownUp') {
+      setMousepressDuration(pressData.duration)
     }
 
     setHeadingText(
       <BoxText>
-        {mouseEnumLookup.get(selectedElement.data.data.button)?.displayString ??
-          ''}
+        {mouseEnumLookup.get(pressData.button)?.displayString ?? ''}
       </BoxText>
     )
   }, [selectedElement])
@@ -64,9 +64,9 @@ export default function MousePressForm({
   )
 
   const onInputBlur = useCallback(() => {
-    if (selectedElement.data.data.type !== 'DownUp') {
-      return
-    }
+    if (selectedElement.data.type !== 'Press') return
+    if (selectedElement.data.data.type !== 'DownUp') return
+
     let duration = DefaultMouseDelay
 
     if (Number.isNaN(mousepressDuration)) {
@@ -89,7 +89,7 @@ export default function MousePressForm({
     const temp: MouseEventAction = {
       ...selectedElement,
       data: {
-        ...selectedElement.data,
+        type: 'Press',
         data: {
           ...selectedElement.data.data,
           duration
@@ -107,32 +107,34 @@ export default function MousePressForm({
 
   const onMousepressTypeChange = useCallback(
     (newType: KeyType) => {
+      if (selectedElement.data.type !== 'Press') return
       setMousepressType(newType)
+      const pressData = selectedElement.data.data
       let temp: MouseEventAction = { ...selectedElement }
       switch (newType) {
         case KeyType.Down:
           temp = {
             ...temp,
-            data: { ...temp.data, data: { ...temp.data.data, type: 'Down' } }
+            data: { type: 'Press', data: { ...pressData, type: 'Down' } }
           }
           break
         case KeyType.Up:
           temp = {
             ...temp,
-            data: { ...temp.data, data: { ...temp.data.data, type: 'Up' } }
+            data: { type: 'Press', data: { ...pressData, type: 'Up' } }
           }
           break
         case KeyType.DownUp:
           temp = {
             ...temp,
             data: {
-              ...temp.data,
+              type: 'Press',
               data: {
-                ...temp.data.data,
+                ...pressData,
                 type: 'DownUp',
                 duration:
-                  temp.data.data.type === 'DownUp'
-                    ? temp.data.data.duration
+                  pressData.type === 'DownUp'
+                    ? pressData.duration
                     : DefaultMouseDelay
               }
             }
@@ -147,9 +149,8 @@ export default function MousePressForm({
   )
 
   const onResetClick = useCallback(() => {
-    if (selectedElement.data.data.type !== 'DownUp') {
-      return
-    }
+    if (selectedElement.data.type !== 'Press') return
+    if (selectedElement.data.data.type !== 'DownUp') return
 
     toast({
       title: 'Default duration applied',
@@ -164,7 +165,7 @@ export default function MousePressForm({
     const temp: MouseEventAction = {
       ...selectedElement,
       data: {
-        ...selectedElement.data,
+        type: 'Press',
         data: {
           ...selectedElement.data.data,
           duration: DefaultMouseDelay

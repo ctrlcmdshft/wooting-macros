@@ -63,6 +63,15 @@ export default function MouseButtonsSection({ elementsToRender }: Props) {
               />
             </AspectRatio>
           ))}
+          <AspectRatio ratio={2 / 0.75}>
+            <SelectElementButton
+              nameText="Mouse Move"
+              properties={{
+                type: 'MouseEventAction',
+                data: { type: 'Move', x: 0, y: 0 }
+              }}
+            />
+          </AspectRatio>
         </SimpleGrid>
       </AccordionPanel>
     </AccordionItem>
