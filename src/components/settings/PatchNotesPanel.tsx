@@ -17,6 +17,76 @@ export default function PatchNotesPanel() {
   return (
     <VStack w="full" spacing={4}>
       <Text w="full" fontWeight="bold" fontSize="sm">
+        March 2026, v. 1.1.1-beta
+      </Text>
+      <VStack w="full">
+        <Heading w="full" size="lg" textColor={whatsNewTextColour}>
+          What's New
+        </Heading>
+        <UnorderedList
+          w="full"
+          px="8"
+          spacing={2}
+          textColor={textColour}
+          fontWeight="semibold"
+        >
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Toggle macro looping.&nbsp;
+            </Text>
+            Toggle macros can now loop — set a fixed loop count or run
+            infinitely until triggered again to stop.
+          </ListItem>
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Copy macro to collection.&nbsp;
+            </Text>
+            Right-click any macro card to copy it to another collection.
+          </ListItem>
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Clipboard restore.&nbsp;
+            </Text>
+            Paste User Defined String now restores your original clipboard
+            content after pasting.
+          </ListItem>
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Bug fixes.&nbsp;
+            </Text>
+            Fixed auto-add delay recording, random collection icons, context
+            menu z-index, and various form loading bugs.
+          </ListItem>
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              SmartScreen warning.&nbsp;
+            </Text>
+            This build is unsigned. Windows may show a SmartScreen warning on
+            first launch — click "More info" then "Run anyway" to proceed.
+          </ListItem>
+        </UnorderedList>
+      </VStack>
+      <Text w="full" fontWeight="bold" fontSize="sm">
         December 21st, 2023, v. 1.1
       </Text>
       <VStack w="full">

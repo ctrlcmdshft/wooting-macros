@@ -151,7 +151,7 @@ export default function SettingsLeftPanel({
               fontSize={{ base: '2xs', md: 'xs' }}
               textColor={applicationTextColour}
             >
-              Version {versionText}
+              Version {versionText}-beta
             </Text>
             <Text
               w="full"
