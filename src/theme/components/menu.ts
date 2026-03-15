@@ -19,7 +19,8 @@ export const Menu = helpers.defineMultiStyleConfig({
       button: {},
       list: {
         bg: mode('bg-light', 'primary-dark.900')(props),
-        borderColor: mode('primary-light.200', 'primary-dark.800')(props)
+        borderColor: mode('primary-light.200', 'primary-dark.800')(props),
+        zIndex: 'dropdown'
       },
       item: {
         bg: mode('bg-light', 'primary-dark.900')(props),

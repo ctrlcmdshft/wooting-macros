@@ -41,29 +41,26 @@ function ApplicationProvider({ children }: ApplicationProviderProps) {
     macroIndex: undefined
   })
   const [appDebugMode, setAppDebugMode] = useState<boolean | null>(null)
+  const toast = useToast()
 
   useEffect(() => {
-    if (appDebugMode === null) {
-      isDebug()
-        .then((value: boolean) => {
-          setAppDebugMode(value)
-        })
-        .catch((error) => {
-          toast({
-            title: 'Debug environment variable set incorrectly!',
-            description: `Debug environment variable exists, but is set to an invalid value. Only 'error', 'warn', 'info' or 'trace' are valid. Debug features disabled.
+    isDebug()
+      .then((value: boolean) => {
+        setAppDebugMode(value)
+      })
+      .catch((e) => {
+        toast({
+          title: 'Debug environment variable set incorrectly!',
+          description: `Debug environment variable exists, but is set to an invalid value. Only 'error', 'warn', 'info' or 'trace' are valid. Debug features disabled.
            Please remove or fix the debug variable, then restart the file explorer process and Wootomation.`,
-            status: 'error',
-            isClosable: true,
-            duration: 10000
-          })
-          setAppDebugMode(false)
-          console.log('Debug mode disabled: ', error)
+          status: 'error',
+          isClosable: true,
+          duration: 10000
         })
-    }
-  })
-
-  const toast = useToast()
+        setAppDebugMode(false)
+        error('Debug mode disabled: ' + e)
+      })
+  }, [])
 
   useEffect(() => {
     invoke<MacroData>('get_macros')

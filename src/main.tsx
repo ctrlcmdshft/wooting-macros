@@ -11,7 +11,7 @@ import { attachConsole } from 'tauri-plugin-log'
 attachConsole()
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
-  <ChakraProvider theme={theme}>
+  <ChakraProvider theme={theme} portalZIndex={100}>
     <ColorModeScript initialColorMode={theme.config.initialColorMode} />
     <ApplicationProvider>
       <SettingsProvider>

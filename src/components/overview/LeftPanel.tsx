@@ -36,12 +36,19 @@ export default function LeftPanel({
   const [parent] = useAutoAnimate<HTMLDivElement>()
   const toast = useToast()
 
+  const RANDOM_COLLECTION_ICONS = [
+    ':tada:', ':fire:', ':star:', ':rocket:', ':zap:', ':gem:', ':trophy:',
+    ':sparkles:', ':rainbow:', ':sunglasses:', ':muscle:', ':lightning:',
+    ':crown:', ':dart:', ':hammer:', ':wrench:', ':bookmark:', ':bell:'
+  ]
+
   const onNewCollectionButtonPress = useCallback(() => {
+    const randomIcon = RANDOM_COLLECTION_ICONS[Math.floor(Math.random() * RANDOM_COLLECTION_ICONS.length)]
     onCollectionAdd({
       active: true,
-      icon: `:😍:`,
+      icon: randomIcon,
       macros: [],
-      name: `Collection ${collections.length + 1}`
+      name: ''
     })
   }, [collections.length, onCollectionAdd])
 

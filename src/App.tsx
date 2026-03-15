@@ -1,3 +1,4 @@
+import { appWindow, LogicalSize } from '@tauri-apps/api/window'
 import { Box, Flex, Text, useDisclosure } from '@chakra-ui/react'
 import Overview from './views/Overview'
 import { ViewState } from './constants/enums'
@@ -63,6 +64,28 @@ function App() {
 
   useEffect(() => {
     init({ data })
+  }, [])
+
+  useEffect(() => {
+    const saved = localStorage.getItem('windowSize')
+    if (saved) {
+      const { width, height } = JSON.parse(saved)
+      appWindow.setSize(new LogicalSize(width, height))
+    }
+
+    let timeout: number
+    const onResize = () => {
+      clearTimeout(timeout)
+      timeout = window.setTimeout(() => {
+        localStorage.setItem(
+          'windowSize',
+          JSON.stringify({ width: window.innerWidth, height: window.innerHeight })
+        )
+      }, 300)
+    }
+
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
   }, [])
 
   if (!initComplete) {

@@ -107,10 +107,10 @@ export default function MacroList({ searchValue }: Props) {
         {!searchValue && (
           <>
             <motion.div
-              initial={{ x: '100vh' }}
-              animate={{ x: 0 }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
               transition={{ ease: 'circOut', duration: 0.2 }}
-              exit={{ x: '100vh' }}
+              exit={{ opacity: 0 }}
             >
               <Flex h="full" justifyContent="center" alignItems="center">
                 <VStack
@@ -141,10 +141,10 @@ export default function MacroList({ searchValue }: Props) {
             {currentCollection.macros.map((macro, index) => (
               <motion.div
                 key={`${macro.name} + ${index}`}
-                initial={{ x: '100vh' }}
+                initial={{ opacity: 0 }}
                 transition={{ ease: 'circOut', duration: 0.2 }}
-                animate={{ x: 0 }}
-                exit={{ x: '100vh' }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
               >
                 <GridItem w="full" h="fit-content">
                   <MacroCard
@@ -162,10 +162,10 @@ export default function MacroList({ searchValue }: Props) {
           matchingMacros.map(({ macro, collection }, index) => (
             <motion.div
               key={`${macro.name} + ${index}`}
-              initial={{ x: '100vh' }}
+              initial={{ opacity: 0 }}
               transition={{ ease: 'circOut', duration: 0.2 }}
-              animate={{ x: 0 }}
-              exit={{ x: '100vh' }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
             >
               <GridItem w="full" h="fit-content">
                 <MacroCard

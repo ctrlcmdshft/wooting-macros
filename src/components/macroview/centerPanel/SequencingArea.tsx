@@ -100,31 +100,27 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
         }
       } else {
         if (checkIfKeypress(item)) {
-          onElementsAdd([
-            {
-              type: 'DelayEventAction',
-              data: timeDiff
-            },
-            {
-              type: 'KeyPressEventAction',
-              data: item
-            }
-          ])
+          if (config.AutoAddDelay) {
+            onElementsAdd([
+              { type: 'DelayEventAction', data: timeDiff },
+              { type: 'KeyPressEventAction', data: item }
+            ])
+          } else {
+            onElementAdd({ type: 'KeyPressEventAction', data: item })
+          }
         } else {
-          onElementsAdd([
-            {
-              type: 'DelayEventAction',
-              data: timeDiff
-            },
-            {
-              type: 'MouseEventAction',
-              data: { type: 'Press', data: item }
-            }
-          ])
+          if (config.AutoAddDelay) {
+            onElementsAdd([
+              { type: 'DelayEventAction', data: timeDiff },
+              { type: 'MouseEventAction', data: { type: 'Press', data: item } }
+            ])
+          } else {
+            onElementAdd({ type: 'MouseEventAction', data: { type: 'Press', data: item } })
+          }
         }
       }
     },
-    [onElementAdd, onElementsAdd, sequence.length, updateElement]
+    [config.AutoAddDelay, onElementAdd, onElementsAdd, sequence.length, updateElement]
   )
 
   const { recording, startRecording, stopRecording } =

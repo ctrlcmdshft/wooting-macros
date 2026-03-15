@@ -6,6 +6,10 @@ export const styles = {
     body: {
       bg: mode('primary-light.50', 'bg-dark')(props),
       color: mode('primary-light.900', 'primary-dark.100')(props)
+    },
+    '.chakra-portal': {
+      zIndex: 9999,
+      position: 'relative'
     }
   })
 }

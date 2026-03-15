@@ -61,12 +61,12 @@ export default function OpenEventForm({
       ...selectedElement,
       data: {
         type: 'Open',
-        action: { type: 'Website', data: path }
+        action: { type: subtype ?? 'Website', data: path }
       }
     }
 
     updateElement(temp, selectedElementId)
-  }, [path, selectedElement, selectedElementId, updateElement])
+  }, [path, subtype, selectedElement, selectedElementId, updateElement])
 
   const onButtonPress = useCallback(
     async (isDirectory: boolean) => {

@@ -3,6 +3,7 @@ use std::{time, vec};
 
 use anyhow::Result;
 use copypasta::{ClipboardContext, ClipboardProvider};
+use log::warn;
 use fastrand;
 use rdev;
 use tokio::sync::mpsc::UnboundedSender;
@@ -76,12 +77,27 @@ impl SystemAction {
                 }
 
                 ClipboardAction::PasteUserDefinedString { data } => {
-                    ClipboardContext::new()
-                        .map_err(|err| anyhow::Error::msg(err.to_string()))?
-                        .set_contents(data.to_owned())
+                    if data.is_empty() {
+                        return Ok(());
+                    }
+                    let mut ctx = ClipboardContext::new()
+                        .map_err(|err| anyhow::Error::msg(err.to_string()))?;
+
+                    // Save the current clipboard content so we can restore it after pasting.
+                    let previous_content = ctx.get_contents().ok();
+
+                    ctx.set_contents(data.to_owned())
                         .map_err(|err| anyhow::Error::msg(err.to_string()))?;
 
                     util::direct_send_hotkey(&send_channel, PASTE_HOTKEY.to_vec()).await?;
+
+                    // Give the OS a moment to complete the paste before restoring.
+                    tokio::time::sleep(time::Duration::from_millis(50)).await;
+
+                    if let Some(prev) = previous_content {
+                        ctx.set_contents(prev)
+                            .unwrap_or_else(|err| warn!("Failed to restore clipboard: {}", err));
+                    }
                 }
 
                 ClipboardAction::Sarcasm => {

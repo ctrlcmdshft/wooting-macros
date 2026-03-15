@@ -38,6 +38,7 @@ export type MacroState = {
   updateMacroName: (newName: string) => void
   updateMacroIcon: (newIcon: string) => void
   updateMacroType: (newType: MacroType) => void
+  updateLoopCount: (count: number | null) => void
   updateTrigger: (newElement: TriggerEventType) => void
   updateAllowWhileOtherKeys: (value: boolean) => void
   onElementAdd: (newElement: ActionEventType) => void
@@ -114,6 +115,7 @@ export interface Macro {
   macro_type: string
   trigger: TriggerEventType
   sequence: ActionEventType[]
+  loop_count?: number | null
 }
 
 export interface Collection {

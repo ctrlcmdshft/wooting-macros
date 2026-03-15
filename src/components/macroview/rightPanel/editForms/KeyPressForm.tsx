@@ -7,7 +7,6 @@ import {
   HStack,
   Input,
   Text,
-  useColorModeValue,
   useToast,
   VStack
 } from '@chakra-ui/react'
@@ -38,8 +37,6 @@ export default function KeyPressForm({
   const [keypressDuration, setKeypressDuration] = useState(DefaultMacroDelay)
   const [keypressType, setKeypressType] = useState<KeyType>()
   const { updateElement } = useMacroContext()
-  const bg = useColorModeValue('primary-light.50', 'primary-dark.700')
-  const kebabColour = useColorModeValue('primary-light.500', 'primary-dark.500')
   const toast = useToast()
 
   useEffect(() => {
@@ -51,8 +48,8 @@ export default function KeyPressForm({
 
     const typeString = selectedElement.data.keytype as keyof typeof KeyType
     setKeypressType(KeyType[typeString])
-    setKeypressDuration(keypressDuration)
-  }, [bg, kebabColour, selectedElement, keypressDuration])
+    setKeypressDuration(selectedElement.data.press_duration)
+  }, [selectedElement])
 
   const onKeypressDurationChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,19 +61,21 @@ export default function KeyPressForm({
   const onInputBlur = useCallback(() => {
     let duration = DefaultMacroDelay
 
-    if (keypressDuration >= DefaultMacroDelay) {
+    if (Number.isNaN(keypressDuration)) {
+      return
+    }
+
+    if (keypressDuration >= 0) {
       duration = keypressDuration
     } else {
       toast({
-        title: 'Minimum duration',
-        description: `Duration must be at least ${DefaultMacroDelay}ms`,
+        title: 'Invalid duration',
+        description: 'Duration cannot be negative',
         status: 'warning',
         duration: 4000,
         isClosable: true
       })
-      if (Number.isNaN(duration)) {
-        return
-      }
+      duration = DefaultMacroDelay
     }
 
     const temp: KeyPressEventAction = {

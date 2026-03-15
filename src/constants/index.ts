@@ -1,3 +1,3 @@
-export const DefaultMacroDelay = 20
-export const DefaultDelayDelay = 20
-export const DefaultMouseDelay = 20
+export const DefaultMacroDelay = 0
+export const DefaultDelayDelay = 0
+export const DefaultMouseDelay = 0

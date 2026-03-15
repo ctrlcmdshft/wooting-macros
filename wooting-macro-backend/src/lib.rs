@@ -11,9 +11,9 @@ use halfbrown::HashMap;
 use itertools::Itertools;
 use log::*;
 use rayon::prelude::*;
-use rdev::simulate;
 use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 use tokio::task;
 
 use config::{ApplicationConfig, ConfigFile};
@@ -105,6 +105,9 @@ pub struct Macro {
     pub macro_type: MacroType,
     pub trigger: TriggerEventType,
     pub active: bool,
+    /// Optional: Maximum number of loop iterations for Toggle macros (None = infinite)
+    #[serde(default)]
+    pub loop_count: Option<u32>,
 }
 
 impl Macro {
@@ -169,6 +172,9 @@ type Collections = Vec<Collection>;
 /// Hashmap to check the first trigger key of each macro.
 type MacroTriggerLookup = HashMap<u32, Vec<Macro>>;
 
+/// Tracks active toggle macros by their name (used as unique identifier)
+type ActiveToggleMacros = Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>;
+
 /// State of the application in RAM (RWlock).
 #[derive(Debug)]
 pub struct MacroBackend {
@@ -176,6 +182,7 @@ pub struct MacroBackend {
     pub config: Arc<RwLock<ApplicationConfig>>,
     pub triggers: Arc<RwLock<MacroTriggerLookup>>,
     pub is_listening: Arc<AtomicBool>,
+    pub active_toggles: ActiveToggleMacros,
 }
 
 ///MacroData is the main data structure that contains all macro data.
@@ -263,8 +270,13 @@ pub struct Collection {
 
 /// Executes a given macro (according to its type).
 ///
-/// ! **UNIMPLEMENTED** - Only Single macro type is implemented for now.
-async fn execute_macro(macros: Macro, channel: UnboundedSender<rdev::EventType>) {
+/// For Toggle macros, returns the task handle so it can be cancelled later.
+/// ! **UNIMPLEMENTED** - OnHold macro type is not yet implemented.
+async fn execute_macro(
+    macros: Macro,
+    channel: UnboundedSender<rdev::EventType>,
+    active_toggles: ActiveToggleMacros,
+) {
     match macros.macro_type {
         MacroType::Single => {
             info!("\nEXECUTING A SINGLE MACRO: {:#?}", macros.name);
@@ -278,12 +290,51 @@ async fn execute_macro(macros: Macro, channel: UnboundedSender<rdev::EventType>)
             });
         }
         MacroType::Toggle => {
-            //Postponed
-            //execute_macro_toggle(&macros).await;
+            info!("\nTOGGLING MACRO: {:#?}", macros.name);
+
+            let macro_name = macros.name.clone();
+            let mut active_toggles_lock = active_toggles.lock().await;
+
+            // Check if this toggle macro is already running
+            if let Some(handle) = active_toggles_lock.remove(&macro_name) {
+                // Stop the running macro
+                info!("Stopping toggle macro: {}", macro_name);
+                handle.abort();
+            } else {
+                // Start the toggle macro
+                info!("Starting toggle macro: {}", macro_name);
+                let loop_count = macros.loop_count;
+                let handle = task::spawn(async move {
+                    let mut iteration = 0u32;
+                    loop {
+                        // Check if we've reached the loop limit
+                        if let Some(max_loops) = loop_count {
+                            if iteration >= max_loops {
+                                info!("Toggle macro {} reached loop limit of {}", macros.name, max_loops);
+                                break;
+                            }
+                        }
+
+                        if let Err(error) = macros.execute(channel.clone()).await {
+                            error!("error executing toggle macro: {}", error);
+                            break;
+                        }
+
+                        iteration += 1;
+
+                        // Small delay between iterations to prevent overwhelming the system
+                        tokio::time::sleep(time::Duration::from_millis(10)).await;
+                    }
+                    info!("Toggle macro {} stopped after {} iterations", macros.name, iteration);
+                });
+
+                active_toggles_lock.insert(macro_name, handle);
+            }
         }
         MacroType::OnHold => {
             //Postponed
             //execute_macro_onhold(&macros).await;
+            warn!("OnHold macro type not yet implemented");
         }
     }
 }
@@ -318,6 +369,7 @@ fn check_macro_execution_efficiently(
     pressed_events: Vec<u32>,
     trigger_overview: Vec<Macro>,
     channel_sender: UnboundedSender<rdev::EventType>,
+    active_toggles: ActiveToggleMacros,
 ) -> bool {
     let trigger_overview_print = trigger_overview.clone();
 
@@ -335,12 +387,13 @@ fn check_macro_execution_efficiently(
 
                             let channel_clone_execute = channel_sender.clone();
                             let macro_clone_execute = macros.clone();
+                            let active_toggles_clone = active_toggles.clone();
 
                             // We don't need this here as there can't be a single key that's a modifier
                             // plugin::util::lift_keys(data, &channel_clone_execute);
 
                             task::spawn(async move {
-                                execute_macro(macro_clone_execute, channel_clone_execute).await;
+                                execute_macro(macro_clone_execute, channel_clone_execute, active_toggles_clone).await;
                             });
                             output = true;
                         }
@@ -356,13 +409,14 @@ fn check_macro_execution_efficiently(
 
                             let channel_clone_execute = channel_sender.clone();
                             let macro_clone_execute = macros.clone();
+                            let active_toggles_clone = active_toggles.clone();
 
                             // This releases any trigger keys that have been held to make macros more reliable when used with modifier hotkeys.
                             plugin::util::lift_keys(data, &channel_clone_execute)
                                 .unwrap_or_else(|err| error!("Error lifting keys: {}", err));
 
                             task::spawn(async move {
-                                execute_macro(macro_clone_execute, channel_clone_execute).await;
+                                execute_macro(macro_clone_execute, channel_clone_execute, active_toggles_clone).await;
                             });
                             output = true;
                         }
@@ -381,9 +435,10 @@ fn check_macro_execution_efficiently(
                 if event_to_check == pressed_events {
                     let channel_clone = channel_sender.clone();
                     let macro_clone = macros.clone();
+                    let active_toggles_clone = active_toggles.clone();
 
                     task::spawn(async move {
-                        execute_macro(macro_clone, channel_clone).await;
+                        execute_macro(macro_clone, channel_clone, active_toggles_clone).await;
                     });
                     output = true;
                 }
@@ -444,6 +499,7 @@ impl MacroBackend {
 
         let inner_triggers = self.triggers.clone();
         let inner_is_listening = self.is_listening.clone();
+        let inner_active_toggles = self.active_toggles.clone();
 
         // Spawn the channels
         let (schan_execute, rchan_execute) = tokio::sync::mpsc::unbounded_channel();
@@ -508,10 +564,12 @@ impl MacroBackend {
                             let should_grab = {
                                 if !check_these_macros.is_empty() {
                                     let channel_copy_send = schan_execute.clone();
+                                    let active_toggles_copy = inner_active_toggles.clone();
                                     check_macro_execution_efficiently(
                                         pressed_keys_copy_converted,
                                         check_these_macros,
                                         channel_copy_send,
+                                        active_toggles_copy,
                                     )
                                 } else {
                                     false
@@ -550,11 +608,13 @@ impl MacroBackend {
                                 };
 
                             let channel_clone = schan_execute.clone();
+                            let active_toggles_copy = inner_active_toggles.clone();
 
                             let should_grab = check_macro_execution_efficiently(
                                 vec![converted_button_to_u32],
                                 check_these_macros,
                                 channel_clone,
+                                active_toggles_copy,
                             );
 
                             // Left mouse button never gets consumed to allow users to control their PC.
@@ -597,6 +657,7 @@ impl Default for MacroBackend {
             )),
             triggers: Arc::new(RwLock::from(triggers)),
             is_listening: Arc::new(AtomicBool::new(true)),
+            active_toggles: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 }

@@ -6,7 +6,6 @@ import {
   GridItem,
   Input,
   Text,
-  useColorModeValue,
   useToast,
   VStack
 } from '@chakra-ui/react'
@@ -39,8 +38,6 @@ export default function MousePressForm({
     useState(DefaultMouseDelay)
   const [mousepressType, setMousepressType] = useState<KeyType>()
   const { updateElement } = useMacroContext()
-  const bg = useColorModeValue('primary-light.50', 'primary-dark.700')
-  const kebabColour = useColorModeValue('primary-light.500', 'primary-dark.500')
   const toast = useToast()
 
   useEffect(() => {
@@ -57,7 +54,7 @@ export default function MousePressForm({
           ''}
       </BoxText>
     )
-  }, [bg, kebabColour, selectedElement])
+  }, [selectedElement])
 
   const onMousepressDurationChange = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -72,18 +69,21 @@ export default function MousePressForm({
     }
     let duration = DefaultMouseDelay
 
-    if (mousepressDuration >= DefaultMouseDelay) {
+    if (Number.isNaN(mousepressDuration)) {
+      return
+    }
+
+    if (mousepressDuration >= 0) {
       duration = mousepressDuration
-    } else if (mousepressDuration < DefaultMouseDelay) {
+    } else {
       toast({
-        title: 'Minimum duration',
-        description: `Duration must be at least ${DefaultMouseDelay}ms`,
+        title: 'Invalid duration',
+        description: 'Duration cannot be negative',
         status: 'warning',
         duration: 4000,
         isClosable: true
       })
-    } else if (Number.isNaN(duration)) {
-      return
+      duration = DefaultMouseDelay
     }
 
     const temp: MouseEventAction = {

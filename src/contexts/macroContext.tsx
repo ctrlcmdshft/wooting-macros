@@ -41,7 +41,8 @@ const macroDefault: Macro = {
   active: true,
   macro_type: 'Single',
   trigger: { type: 'KeyPressEvent', data: [], allow_while_other_keys: false },
-  sequence: []
+  sequence: [],
+  loop_count: null
 }
 
 function MacroProvider({ children }: MacroProviderProps) {
@@ -177,6 +178,13 @@ function MacroProvider({ children }: MacroProviderProps) {
   const updateMacroType = useCallback(
     (newType: MacroType) => {
       setMacro({ ...macro, macro_type: MacroType[newType] })
+    },
+    [macro, setMacro]
+  )
+
+  const updateLoopCount = useCallback(
+    (count: number | null) => {
+      setMacro({ ...macro, loop_count: count })
     },
     [macro, setMacro]
   )
@@ -355,6 +363,7 @@ function MacroProvider({ children }: MacroProviderProps) {
       updateMacroName,
       updateMacroIcon,
       updateMacroType,
+      updateLoopCount,
       updateTrigger,
       updateAllowWhileOtherKeys,
       onElementAdd,
@@ -381,6 +390,7 @@ function MacroProvider({ children }: MacroProviderProps) {
       updateMacroName,
       updateMacroIcon,
       updateMacroType,
+      updateLoopCount,
       updateTrigger,
       updateAllowWhileOtherKeys,
       onElementAdd,

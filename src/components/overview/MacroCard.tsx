@@ -21,7 +21,7 @@ import { HIDLookup } from '../../constants/HIDmap'
 import { useApplicationContext } from '../../contexts/applicationContext'
 import { useSelectedCollection } from '../../contexts/selectors'
 import { mouseEnumLookup } from '../../constants/MouseMap'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { KebabVertical } from '../icons'
 import useMainBgColour from '../../hooks/useMainBgColour'
 
@@ -40,7 +40,7 @@ export default function MacroCard({
   collectionName,
   searchValue
 }: Props) {
-  const { selection, onCollectionUpdate, changeSelectedMacroIndex } =
+  const { collections, selection, onCollectionUpdate, changeSelectedMacroIndex } =
     useApplicationContext()
   const currentCollection = useSelectedCollection()
   const secondBg = useColorModeValue('blue.50', 'gray.800')
@@ -71,9 +71,19 @@ export default function MacroCard({
     onCollectionUpdate(newCollection, selection.collectionIndex)
   }, [currentCollection, macro, onCollectionUpdate, selection.collectionIndex])
 
+  const onDuplicateTo = useCallback((targetCollectionName: string) => {
+    const targetIndex = collections.findIndex((c) => c.name === targetCollectionName)
+    if (targetIndex === -1) return
+    const target = { ...collections[targetIndex] }
+    target.macros = [...target.macros, macro]
+    onCollectionUpdate(target, targetIndex)
+  }, [collections, macro, onCollectionUpdate])
+
   const isSearching: boolean = useMemo((): boolean => {
     return searchValue.length !== 0
   }, [searchValue])
+
+  const [menuOpen, setMenuOpen] = useState(false)
 
   return (
     <VStack
@@ -86,6 +96,8 @@ export default function MacroCard({
       m="auto"
       justifyContent="space-between"
       spacing={4}
+      position="relative"
+      zIndex={menuOpen ? 10 : 1}
     >
       {/** Top Row */}
       <HStack
@@ -111,7 +123,7 @@ export default function MacroCard({
             {macro.name}
           </Text>
         </Flex>
-        <Menu variant="brand">
+        <Menu variant="brand" onOpen={() => setMenuOpen(true)} onClose={() => setMenuOpen(false)}>
           <MenuButton
             h="24px"
             aria-label="macro options"
@@ -120,10 +132,22 @@ export default function MacroCard({
           >
             <KebabVertical />
           </MenuButton>
-          <MenuList p="2" right={0}>
+          <MenuList p="2" zIndex={9999}>
             <MenuItem onClick={onDuplicate}>Duplicate</MenuItem>
-            {/* <MenuItem isDisabled>Move to Collection</MenuItem> */}
-            {/* <MenuItem isDisabled>Export</MenuItem> */}
+            {collections.length > 1 && (
+              <>
+                {collections
+                  .filter((_, i) => i !== selection.collectionIndex)
+                  .map((col, i) => (
+                    <MenuItem
+                      key={i}
+                      onClick={() => onDuplicateTo(col.name)}
+                    >
+                      Copy to: {col.name}
+                    </MenuItem>
+                  ))}
+              </>
+            )}
             <Divider />
             <MenuItem
               onClick={() => onDelete(index)}

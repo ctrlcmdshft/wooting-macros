@@ -53,7 +53,7 @@ export default function ApplicationSettingsPanel() {
       <VStack w="full" spacing={[4]}>
         <ToggleSetting
           title="Auto-add Delay"
-          description="When enabled, a delay element is automatically added to the sequence, if the last element of the sequence is not a delay."
+          description="When enabled, timing delays are automatically inserted between keypresses when recording a sequence."
           value={config.AutoAddDelay}
           onChange={updateAutoAddDelay}
         />

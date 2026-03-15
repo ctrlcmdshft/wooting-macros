@@ -240,17 +240,15 @@ async fn main() -> Result<(), Error> {
                 }
             }
         })
-        .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
-            info!("{}, {argv:?}, {cwd}", app.package_info().name);
-
-            let window = app.get_window("main").expect("Couldn't fetch window");
-
-            window.show().expect("Couldn't show window");
-            window.set_focus().expect("Couldn't focus window");
-
-            app.emit_all("single-instance", ())
-                .expect("Couldn't re-focus opened instance.");
-        }))
+        // tauri-plugin-single-instance crashes on Windows (issue #207) — disabled until fixed
+        //.plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
+        //    info!("{}, {argv:?}, {cwd}", app.package_info().name);
+        //    let window = app.get_window("main").expect("Couldn't fetch window");
+        //    window.show().expect("Couldn't show window");
+        //    window.set_focus().expect("Couldn't focus window");
+        //    app.emit_all("single-instance", ())
+        //        .expect("Couldn't re-focus opened instance.");
+        //}))
         .plugin(
             tauri_plugin_log::Builder::default()
                 .level(log_level)
