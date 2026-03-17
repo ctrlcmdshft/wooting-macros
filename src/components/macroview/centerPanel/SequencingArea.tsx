@@ -13,8 +13,8 @@ import {
   VStack
 } from '@chakra-ui/react'
 import { DeleteIcon, SettingsIcon, TimeIcon } from '@chakra-ui/icons'
-import { useCallback } from 'react'
-import { Keypress, MousePressAction } from '../../../types'
+import { useCallback, useEffect, useRef } from 'react'
+import { ActionEventType, Keypress, MousePathPoint, MousePressAction } from '../../../types'
 import { useMacroContext } from '../../../contexts/macroContext'
 import useRecordingSequence from '../../../hooks/useRecordingSequence'
 import { useSettingsContext } from '../../../contexts/settingsContext'
@@ -24,7 +24,6 @@ import ClearSequenceModal from './ClearSequenceModal'
 import { RecordIcon, StopIcon } from '../../icons'
 import SortableList from './SortableList'
 import useMainBgColour from '../../../hooks/useMainBgColour'
-import { useApplicationContext } from '../../../contexts/applicationContext'
 
 interface Props {
   onOpenMacroSettingsModal: () => void
@@ -36,11 +35,11 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
     willCauseTriggerLooping,
     onElementAdd,
     onElementsAdd,
-    updateElement
+    updateElement,
+    overwriteSequence
   } = useMacroContext()
-  const { config, updateAutoAddDelay } = useSettingsContext()
+  const { config, updateAutoAddDelay, updateRecordMouseMovement } = useSettingsContext()
   const { isOpen, onOpen, onClose } = useDisclosure()
-  const { appDebugMode } = useApplicationContext()
 
   const onItemChanged = useCallback(
     (
@@ -52,32 +51,26 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
       if (item === undefined) {
         return
       }
-      // If necessary, adjust previous element.
+
+      // Merge Down+Up into a single DownUp element on the Up event
       if (isUpEvent && prevItem !== undefined) {
         if (checkIfKeypress(prevItem) && checkIfKeypress(item)) {
           if (prevItem.keypress === item.keypress) {
             updateElement(
               {
                 type: 'KeyPressEventAction',
-                data: {
-                  ...prevItem,
-                  keytype: KeyType[KeyType.DownUp],
-                  press_duration: timeDiff
-                }
+                data: { ...prevItem, keytype: KeyType[KeyType.DownUp], press_duration: timeDiff }
               },
               sequence.length - 1
             )
             return
           }
         } else if (checkIfMouseButton(prevItem) && checkIfMouseButton(item)) {
-          if (prevItem.button === item.button) {
+          if (prevItem.button === item.button && mousePathRef.current.length === 0) {
             updateElement(
               {
                 type: 'MouseEventAction',
-                data: {
-                  type: 'Press',
-                  data: { ...prevItem, type: 'DownUp', duration: timeDiff }
-                }
+                data: { type: 'Press', data: { ...prevItem, type: 'DownUp', duration: timeDiff } }
               },
               sequence.length - 1
             )
@@ -85,46 +78,91 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
           }
         }
       }
-      // Add elements to the sequence. If there is no previous item, the item we are adding is the first one, thus we do not include a delay element.
-      if (prevItem === undefined) {
-        if (checkIfKeypress(item)) {
-          onElementAdd({
-            type: 'KeyPressEventAction',
-            data: item
-          })
-        } else {
-          onElementAdd({
+
+      // Build the batch of elements to add in order:
+      // 1. Flush any pending mouse path so movements appear before this click/key
+      // 2. Optional delay
+      // 3. The key/button event itself
+      const toAdd: Parameters<typeof onElementsAdd>[0] = []
+
+      const path = mousePathRef.current
+      if (path.length > 0) {
+        const pathData: MousePathPoint[] = path.map((p, i) => ({
+          x: p.x,
+          y: p.y,
+          delta_ms: i === 0 ? 0 : Math.round(p.timestamp - path[i - 1].timestamp)
+        }))
+        mousePathRef.current = []
+
+        // Mouse-up with a recorded path: insert a zero-delay move-to-start before the
+        // mouse-down that was already appended, so playback positions the cursor first.
+        if (isUpEvent && checkIfMouseButton(item) && sequence.length > 0) {
+          const preMoveAction: ActionEventType = {
+            type: 'MousePathEventAction',
+            data: [{ x: pathData[0].x, y: pathData[0].y, delta_ms: 0 }]
+          }
+          const mouseUpAction: ActionEventType = {
             type: 'MouseEventAction',
             data: { type: 'Press', data: item }
-          })
+          }
+          overwriteSequence([
+            ...sequence.slice(0, sequence.length - 1),
+            preMoveAction,
+            sequence[sequence.length - 1],
+            { type: 'MousePathEventAction', data: pathData },
+            mouseUpAction
+          ])
+          return
         }
+
+        toAdd.push({ type: 'MousePathEventAction', data: pathData })
+      }
+
+      if (prevItem !== undefined && config.AutoAddDelay) {
+        toAdd.push({ type: 'DelayEventAction', data: timeDiff })
+      }
+
+      if (checkIfKeypress(item)) {
+        toAdd.push({ type: 'KeyPressEventAction', data: item })
       } else {
-        if (checkIfKeypress(item)) {
-          if (config.AutoAddDelay) {
-            onElementsAdd([
-              { type: 'DelayEventAction', data: timeDiff },
-              { type: 'KeyPressEventAction', data: item }
-            ])
-          } else {
-            onElementAdd({ type: 'KeyPressEventAction', data: item })
-          }
-        } else {
-          if (config.AutoAddDelay) {
-            onElementsAdd([
-              { type: 'DelayEventAction', data: timeDiff },
-              { type: 'MouseEventAction', data: { type: 'Press', data: item } }
-            ])
-          } else {
-            onElementAdd({ type: 'MouseEventAction', data: { type: 'Press', data: item } })
-          }
-        }
+        toAdd.push({ type: 'MouseEventAction', data: { type: 'Press', data: item } })
+      }
+
+      if (toAdd.length === 1) {
+        onElementAdd(toAdd[0])
+      } else {
+        onElementsAdd(toAdd)
       }
     },
-    [config.AutoAddDelay, onElementAdd, onElementsAdd, sequence.length, updateElement]
+    [config.AutoAddDelay, onElementAdd, onElementsAdd, overwriteSequence, sequence, updateElement]
   )
 
+  const mousePathRef = useRef<Array<{ x: number; y: number; timestamp: number }>>([])
+  const wasRecordingRef = useRef(false)
+
+  const onMouseMove = useCallback((x: number, y: number, timestamp: number) => {
+    mousePathRef.current.push({ x, y, timestamp })
+  }, [])
+
   const { recording, startRecording, stopRecording } =
-    useRecordingSequence(onItemChanged)
+    useRecordingSequence(onItemChanged, config.RecordMouseMovement ? onMouseMove : undefined, config.RecordingHotkey)
+
+  useEffect(() => {
+    if (!recording && wasRecordingRef.current) {
+      updateRecordMouseMovement(false)
+      const path = mousePathRef.current
+      if (path.length > 0) {
+        const pathData: MousePathPoint[] = path.map((p, i) => ({
+          x: p.x,
+          y: p.y,
+          delta_ms: i === 0 ? 0 : Math.round(p.timestamp - path[i - 1].timestamp)
+        }))
+        onElementAdd({ type: 'MousePathEventAction', data: pathData })
+      }
+      mousePathRef.current = []
+    }
+    wasRecordingRef.current = recording
+  }, [recording, onElementAdd])
 
   return (
     <VStack w="41%" h="full" bg={useMainBgColour()} justifyContent="top">
@@ -168,10 +206,25 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
           size={['xs', 'sm', 'md']}
           fontSize={['xs', 'xs', 'lg']}
           isActive={recording}
-          onClick={recording ? stopRecording : startRecording}
+          onClick={() => recording ? stopRecording() : startRecording()}
         >
           {recording ? 'Stop' : 'Record'}
         </Button>
+        <Tooltip
+          label="Mouse path recording — coming soon"
+          hasArrow
+          variant="brand"
+        >
+          <Button
+            size={['xs', 'sm', 'md']}
+            fontSize={['xs', 'xs', 'lg']}
+            variant="brandRecord"
+            isDisabled
+            opacity={0.4}
+          >
+            Mouse
+          </Button>
+        </Tooltip>
         <Tooltip
           label={`Auto-add delay while recording: ${config.AutoAddDelay ? 'On' : 'Off'}`}
           hasArrow
@@ -187,42 +240,41 @@ export default function SequencingArea({ onOpenMacroSettingsModal }: Props) {
             _hover={{ bg: config.AutoAddDelay ? 'yellow.400' : undefined }}
             onClick={() => updateAutoAddDelay(!config.AutoAddDelay)}
           >
-            Auto Delay
+            Delay
           </Button>
         </Tooltip>
-        <Button
-          variant="brandRecord"
-          leftIcon={<TimeIcon />}
-          size={['xs', 'sm', 'md']}
-          fontSize={['xs', 'xs', 'lg']}
-          onClick={() => {
-            onElementAdd({
-              type: 'DelayEventAction',
-              data: config.DefaultDelayValue
-            })
-          }}
-        >
-          Add Delay
-        </Button>
-        <Button
-          variant="brandWarning"
-          leftIcon={<DeleteIcon />}
-          size={['xs', 'sm', 'md']}
-          fontSize={['xs', 'xs', 'lg']}
-          onClick={onOpen}
-          isDisabled={sequence.length === 0}
-        >
-          Clear All
-        </Button>
+        <Tooltip label="Add Delay" hasArrow variant="brand">
+          <IconButton
+            aria-label="Add Delay"
+            variant="brandRecord"
+            icon={<TimeIcon />}
+            size={['xs', 'sm', 'md']}
+            onClick={() => {
+              onElementAdd({
+                type: 'DelayEventAction',
+                data: config.DefaultDelayValue
+              })
+            }}
+          />
+        </Tooltip>
+        <Tooltip label="Clear All" hasArrow variant="brand">
+          <IconButton
+            aria-label="Clear All"
+            variant="brandWarning"
+            icon={<DeleteIcon />}
+            size={['xs', 'sm', 'md']}
+            onClick={onOpen}
+            isDisabled={sequence.length === 0}
+          />
+        </Tooltip>
 
         <Tooltip
-          label="Open Macro Advanced Settings (coming soon)"
+          label="Advanced Macro Settings"
           hasArrow
           variant="brand"
         >
           <IconButton
             variant="brand"
-            isDisabled={!appDebugMode}
             aria-label="MacroSettings"
             icon={<SettingsIcon />}
             size={['xs', 'sm', 'md']}

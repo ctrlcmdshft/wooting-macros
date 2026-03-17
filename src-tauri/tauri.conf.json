@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "Wootomation",
-    "version": "1.1.2"
+    "version": "1.1.3"
   },
   "tauri": {
     "allowlist": {
@@ -55,7 +55,7 @@
         "wix": {
           "bannerPath": "icons/install-banner-493x58.png",
           "dialogImagePath": "icons/dialog-image-493x312.png",
-          "license": "../LICENSE"
+          "license": "EULA.rtf"
         },
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",

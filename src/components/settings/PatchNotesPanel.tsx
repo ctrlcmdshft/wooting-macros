@@ -17,6 +17,78 @@ export default function PatchNotesPanel() {
   return (
     <VStack w="full" spacing={4}>
       <Text w="full" fontWeight="bold" fontSize="sm">
+        March 2026, v. 1.1.3-beta
+      </Text>
+      <VStack w="full">
+        <Heading w="full" size="lg" textColor={whatsNewTextColour}>
+          What's New
+        </Heading>
+        <UnorderedList
+          w="full"
+          px="8"
+          spacing={2}
+          textColor={textColour}
+          fontWeight="semibold"
+        >
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Always on top.&nbsp;
+            </Text>
+            New option in Application Settings to keep the Wootomation window
+            above all other windows.
+          </ListItem>
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Toolbar cleanup.&nbsp;
+            </Text>
+            The sequence toolbar no longer gets cut off at smaller window sizes
+            — delay and clear buttons are now icon-only with tooltips.
+          </ListItem>
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Recording hotkey fix.&nbsp;
+            </Text>
+            The F7 recording hotkey now works correctly when the Wootomation
+            window is focused, and no longer records itself into the sequence.
+          </ListItem>
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Mouse path recording (coming soon).&nbsp;
+            </Text>
+            TinyTask-style mouse path recording is in progress — the button is
+            currently disabled while it&apos;s being finished up.
+          </ListItem>
+          <ListItem>
+            <Text
+              as="span"
+              fontFamily="Montserrat"
+              textColor={highlightedTextColour}
+            >
+              Anti-cheat disclaimer.&nbsp;
+            </Text>
+            We are not responsible for any bans or penalties resulting from the
+            use of Wootomation in games with anti-cheat software. Use at your
+            own risk.
+          </ListItem>
+        </UnorderedList>
+      </VStack>
+      <Text w="full" fontWeight="bold" fontSize="sm">
         March 2026, v. 1.1.2-beta
       </Text>
       <VStack w="full">
@@ -40,17 +112,6 @@ export default function PatchNotesPanel() {
             </Text>
             Delay elements now support a random range — set a min and max and
             each run picks a random value in between for more natural timing.
-          </ListItem>
-          <ListItem>
-            <Text
-              as="span"
-              fontFamily="Montserrat"
-              textColor={highlightedTextColour}
-            >
-              Mouse move action.&nbsp;
-            </Text>
-            New Mouse Move element in the sequence editor — moves the cursor to
-            an absolute screen position.
           </ListItem>
           <ListItem>
             <Text
