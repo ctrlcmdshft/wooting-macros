@@ -83,7 +83,7 @@ export default function EditArea() {
         return (
           <MousePressForm
             selectedElementId={selectedElementId}
-            selectedElement={selectedElement}
+            selectedElement={selectedElement as any}
           />
         )
       default:
