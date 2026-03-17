@@ -19,14 +19,16 @@ import {
   ResetDefaultIcon,
   UpArrowIcon
 } from '../../../icons'
-import { MouseEventAction } from '../../../../types'
+import { MouseEventAction, MousePressAction } from '../../../../types'
 
 import { DefaultMouseDelay } from '../../../../constants'
 import { BoxText } from '../EditArea'
 
+type PressMouseEventAction = MouseEventAction & { data: { type: 'Press'; data: MousePressAction } }
+
 interface Props {
   selectedElementId: number
-  selectedElement: MouseEventAction
+  selectedElement: PressMouseEventAction
 }
 
 export default function MousePressForm({
