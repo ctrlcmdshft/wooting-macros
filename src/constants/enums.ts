@@ -29,7 +29,10 @@ export enum MouseButton {
   Right = 258,
   Middle = 259,
   Mouse4 = 260,
-  Mouse5 = 261
+  Mouse5 = 261,
+  Mouse6 = 262,
+  Mouse7 = 263,
+  Mouse8 = 264
 }
 
 export enum SettingsCategory {
@@ -44,6 +47,7 @@ export enum HIDCategory {
   Function, // F1-24
   Modifier,
   Navigation, // arrow keys and pg up, pg down, etc
+  Media, // volume, media controls
 }
 
 /** To be Expanded */

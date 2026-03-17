@@ -1,14 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { KeyType, MouseButton } from '../constants/enums'
-import {
-  webCodeLocationHidEncode,
-  webCodeLocationHIDLookup
-} from '../constants/HIDmap'
+import { webCodeLocationHidEncode, webCodeLocationHIDLookup } from '../constants/HIDmap'
 import { webButtonLookup } from '../constants/MouseMap'
 import { Keypress, MousePressAction } from '../types'
 import { error } from 'tauri-plugin-log'
 import { useToast } from '@chakra-ui/react'
 import { invoke } from '@tauri-apps/api'
+import { listen, UnlistenFn } from '@tauri-apps/api/event'
+
+type RecordedEvent =
+  | { type: 'KeyPress'; hid_code: number; timestamp_ms: number }
+  | { type: 'KeyRelease'; hid_code: number; timestamp_ms: number }
+  | { type: 'ButtonPress'; button_code: number; timestamp_ms: number }
+  | { type: 'ButtonRelease'; button_code: number; timestamp_ms: number }
+  | { type: 'MouseMove'; x: number; y: number; timestamp_ms: number }
 
 export default function useRecordingSequence(
   onItemChanged: (
@@ -16,166 +21,190 @@ export default function useRecordingSequence(
     prevItem: Keypress | MousePressAction | undefined,
     timeDiff: number,
     isUpEvent: boolean
-  ) => void
+  ) => void,
+  onMouseMove?: (x: number, y: number, timestamp: number) => void,
+  recordingHotkeyHid?: number
 ) {
   const [recording, setRecording] = useState(false)
-  const [item, setItem] = useState<Keypress | MousePressAction | undefined>(
-    undefined
-  )
-  const [prevItem, setPrevItem] = useState<
-    Keypress | MousePressAction | undefined
-  >(undefined)
+  const [item, setItem] = useState<Keypress | MousePressAction | undefined>(undefined)
+  const [prevItem, setPrevItem] = useState<Keypress | MousePressAction | undefined>(undefined)
+  const [eventType, setEventType] = useState<'Down' | 'Up'>('Down')
+  const [prevEventType, setPrevEventType] = useState<'Down' | 'Up'>('Down')
+  const [prevTimestamp, setPrevTimestamp] = useState(0)
 
   const toast = useToast()
 
-  const [eventType, setEventType] = useState<'Down' | 'Up'>('Down')
-  const [prevEventType, setPrevEventType] = useState<'Down' | 'Up'>('Down')
+  // Refs to hold latest values inside Tauri event callbacks
+  const itemRef = useRef(item)
+  const prevItemRef = useRef(prevItem)
+  const eventTypeRef = useRef(eventType)
+  const prevTimestampRef = useRef(prevTimestamp)
 
-  const [prevTimestamp, setPrevTimestamp] = useState(0)
+  useEffect(() => { itemRef.current = item }, [item])
+  useEffect(() => { prevItemRef.current = prevItem }, [prevItem])
+  useEffect(() => { eventTypeRef.current = eventType }, [eventType])
+  useEffect(() => { prevTimestampRef.current = prevTimestamp }, [prevTimestamp])
 
-  const startRecording = useCallback(() => {
+  const startRecording = useCallback(async () => {
     setItem(undefined)
     setPrevItem(undefined)
     setRecording(true)
-  }, [setItem, setRecording])
+    await invoke<void>('start_recording').catch((e: string) => error(e))
+  }, [])
 
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback(async () => {
     setRecording(false)
-  }, [setRecording])
+    await invoke<void>('stop_recording').catch((e: string) => error(e))
+  }, [])
 
-  const addKeypress = useCallback(
-    (event: KeyboardEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
+  // Handle a recorded key/button event (same pairing logic as DOM-based version)
+  const handleKeypress = useCallback(
+    (hidCode: number, timestamp: number, isUp: boolean) => {
+      const timeDiff = Math.round(timestamp - prevTimestampRef.current)
+      setPrevTimestamp(timestamp)
+      setPrevEventType(eventTypeRef.current)
+      setPrevItem(itemRef.current)
 
-      if (event.repeat) {
-        return
-      }
-      const HIDIdentifier = webCodeLocationHidEncode(
-        event.which,
-        event.location
-      )
-
-      const HIDcode = webCodeLocationHIDLookup.get(HIDIdentifier)?.HIDcode
-      if (HIDcode === undefined) {
-        return
-      }
-      const timeDiff = Math.round(event.timeStamp - prevTimestamp)
-
-      setPrevTimestamp(event.timeStamp)
-      setPrevEventType(eventType)
-      setPrevItem(item)
-
-      if (event.type === 'keyup') {
+      if (isUp) {
         setEventType('Up')
-        const keyup: Keypress = {
-          keypress: HIDcode,
-          press_duration: 0,
-          keytype: KeyType[KeyType.Up]
-        }
+        const keyup: Keypress = { keypress: hidCode, press_duration: 0, keytype: KeyType[KeyType.Up] }
         setItem(keyup)
-        onItemChanged(keyup, item, timeDiff, true)
-        return
+        onItemChanged(keyup, itemRef.current, timeDiff, true)
+      } else {
+        setEventType('Down')
+        const keydown: Keypress = { keypress: hidCode, press_duration: 0, keytype: KeyType[KeyType.Down] }
+        setItem(keydown)
+        onItemChanged(keydown, itemRef.current, timeDiff, false)
       }
-
-      setEventType('Down')
-      const keydown: Keypress = {
-        keypress: HIDcode,
-        press_duration: 0,
-        keytype: KeyType[KeyType.Down]
-      }
-      setItem(keydown)
-      onItemChanged(keydown, item, timeDiff, false)
     },
-    [eventType, item, onItemChanged, prevTimestamp]
+    [onItemChanged]
   )
 
-  const addMousepress = useCallback(
-    (event: MouseEvent) => {
-      event.preventDefault()
-      event.stopPropagation()
+  const handleMouseButton = useCallback(
+    (buttonCode: number, timestamp: number, isUp: boolean) => {
+      const button = buttonCode as MouseButton
+      const timeDiff = Math.round(timestamp - prevTimestampRef.current)
+      setPrevTimestamp(timestamp)
+      setPrevEventType(eventTypeRef.current)
+      setPrevItem(itemRef.current)
 
-      if (
-        (event.target as HTMLElement).localName === 'button' ||
-        (event.target as HTMLElement).localName === 'svg' ||
-        (event.target as HTMLElement).localName === 'path'
-      ) {
-        return
-      }
-
-      const enumVal = webButtonLookup.get(event.button)?.enumVal
-      if (enumVal === undefined) {
-        return
-      }
-
-      // We want to stop the recording when the left mouse button is pressed. Currently, always stops the recording
-      if (enumVal === MouseButton.Left) {
-        toast({
-          title: `Sequence recording stopped`,
-          description: `To record Mouse Button 1, insert the button from the left panel.`,
-          status: 'info',
-          duration: 4000,
-          isClosable: true
-        })
-        setRecording(false)
-        return
-      }
-
-      const timeDiff = Math.round(event.timeStamp - prevTimestamp)
-      setPrevTimestamp(event.timeStamp)
-      setPrevEventType(eventType)
-      setPrevItem(item)
-
-      if (event.type === 'mouseup') {
+      if (isUp) {
         setEventType('Up')
-        const mouseup: MousePressAction = {
-          type: 'Up',
-          button: enumVal
-        }
+        const mouseup: MousePressAction = { type: 'Up', button }
         setItem(mouseup)
-        onItemChanged(mouseup, item, timeDiff, true)
+        onItemChanged(mouseup, itemRef.current, timeDiff, true)
+      } else {
+        setEventType('Down')
+        const mousedown: MousePressAction = { type: 'Down', button }
+        setItem(mousedown)
+        onItemChanged(mousedown, itemRef.current, timeDiff, false)
+      }
+    },
+    [onItemChanged, stopRecording, toast]
+  )
+
+  // Stable refs for use inside always-on callbacks
+  const recordingRef = useRef(recording)
+  const handleKeypressRef = useRef(handleKeypress)
+  const handleMouseButtonRef = useRef(handleMouseButton)
+  const onMouseMoveRef = useRef(onMouseMove)
+  const recordingHotkeyHidRef = useRef(recordingHotkeyHid)
+  useEffect(() => { recordingRef.current = recording }, [recording])
+  useEffect(() => { handleKeypressRef.current = handleKeypress }, [handleKeypress])
+  useEffect(() => { handleMouseButtonRef.current = handleMouseButton }, [handleMouseButton])
+  useEffect(() => { onMouseMoveRef.current = onMouseMove }, [onMouseMove])
+  useEffect(() => { recordingHotkeyHidRef.current = recordingHotkeyHid }, [recordingHotkeyHid])
+
+  // DOM listeners: hotkey toggle (always) + key capture when recording & app focused.
+  // This handles both cases when the Tauri event bridge is unreliable with app focused.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const hidIdentifier = webCodeLocationHidEncode(e.which, e.location)
+      const hidInfo = webCodeLocationHIDLookup.get(hidIdentifier)
+      if (!hidInfo) return
+
+      // Hotkey: toggle recording regardless of recording state
+      if (recordingHotkeyHid !== undefined && hidInfo.HIDcode === recordingHotkeyHid) {
+        e.preventDefault()
+        if (recordingRef.current) {
+          stopRecording()
+        } else {
+          startRecording()
+        }
         return
       }
 
-      setEventType('Down')
-      const mousedown: MousePressAction = {
-        type: 'Down',
-        button: enumVal
+      // Capture keypress when recording
+      if (recordingRef.current) {
+        e.preventDefault()
+        handleKeypressRef.current(hidInfo.HIDcode, Date.now(), false)
       }
-
-      setItem(mousedown)
-      onItemChanged(mousedown, item, timeDiff, false)
-    },
-    [eventType, item, onItemChanged, prevTimestamp]
-  )
-
-  useEffect(() => {
-    if (!recording) {
-      return
     }
 
-    window.addEventListener('keydown', addKeypress, false)
-    window.addEventListener('mousedown', addMousepress, false)
-    window.addEventListener('keyup', addKeypress, false)
-    window.addEventListener('mouseup', addMousepress, false)
-    invoke<void>('control_grabbing', { frontendBool: false }).catch(
-      (e: string) => {
-        error(e)
-      }
-    )
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (!recordingRef.current) return
+      const hidIdentifier = webCodeLocationHidEncode(e.which, e.location)
+      const hidInfo = webCodeLocationHIDLookup.get(hidIdentifier)
+      if (!hidInfo) return
+      if (recordingHotkeyHid !== undefined && hidInfo.HIDcode === recordingHotkeyHid) return
+      handleKeypressRef.current(hidInfo.HIDcode, Date.now(), true)
+    }
 
+    document.addEventListener('keydown', onKeyDown, true)
+    document.addEventListener('keyup', onKeyUp, true)
     return () => {
-      window.removeEventListener('keydown', addKeypress, false)
-      window.removeEventListener('mousedown', addMousepress, false)
-      window.removeEventListener('keyup', addKeypress, false)
-      window.removeEventListener('mouseup', addMousepress, false)
-      invoke<void>('control_grabbing', { frontendBool: true }).catch(
-        (e: string) => {
-          error(e)
-        }
-      )
+      document.removeEventListener('keydown', onKeyDown, true)
+      document.removeEventListener('keyup', onKeyUp, true)
     }
-  }, [recording, addKeypress, addMousepress])
+  }, [recordingHotkeyHid, startRecording, stopRecording])
+
+  // rdev events: used when app is NOT focused (background recording).
+  // Skip when focused to avoid double-processing with the DOM listeners above.
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null
+
+    listen<RecordedEvent>('recording_event', (event) => {
+      if (!recordingRef.current) return
+      if (document.hasFocus()) return
+      const data = event.payload
+      switch (data.type) {
+        case 'KeyPress':
+          if (recordingHotkeyHidRef.current !== undefined && data.hid_code === recordingHotkeyHidRef.current) break
+          handleKeypressRef.current(data.hid_code, data.timestamp_ms, false)
+          break
+        case 'KeyRelease':
+          if (recordingHotkeyHidRef.current !== undefined && data.hid_code === recordingHotkeyHidRef.current) break
+          handleKeypressRef.current(data.hid_code, data.timestamp_ms, true)
+          break
+        case 'ButtonPress':
+          handleMouseButtonRef.current(data.button_code, data.timestamp_ms, false)
+          break
+        case 'ButtonRelease':
+          handleMouseButtonRef.current(data.button_code, data.timestamp_ms, true)
+          break
+        case 'MouseMove':
+          onMouseMoveRef.current?.(data.x, data.y, data.timestamp_ms)
+          break
+      }
+    }).then((u) => { unlisten = u })
+
+    return () => { unlisten?.() }
+  }, [])
+
+  // Hotkey from backend when app is NOT focused
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null
+
+    listen<boolean>('recording_state', (event) => {
+      if (event.payload) {
+        startRecording()
+      } else {
+        stopRecording()
+      }
+    }).then((u) => { unlisten = u })
+
+    return () => { unlisten?.() }
+  }, [startRecording, stopRecording])
 
   return {
     recording,

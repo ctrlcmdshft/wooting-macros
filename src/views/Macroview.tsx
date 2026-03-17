@@ -1,10 +1,11 @@
-import { HStack, VStack } from '@chakra-ui/react'
+import { HStack, VStack, useDisclosure } from '@chakra-ui/react'
 import EditArea from '../components/macroview/rightPanel/EditArea'
 import SelectElementArea from '../components/macroview/leftPanel/SelectElementArea'
 import SequencingArea from '../components/macroview/centerPanel/SequencingArea'
 import Header from '../components/macroview/topArea/Header'
 import { useMacroContext } from '../contexts/macroContext'
 import { useEffect, useState } from 'react'
+import MacroAdvancedSettingsModal from './MacroAdvancedSettingsModal'
 
 type Props = {
   isEditing: boolean
@@ -13,10 +14,11 @@ type Props = {
 
 export default function Macroview({
   isEditing,
-  onOpenMacroSettingsModal
+  onOpenMacroSettingsModal: _onOpenMacroSettingsModal
 }: Props) {
   const { changeIsUpdatingMacro } = useMacroContext()
   const [searchValue, changeSearchValue] = useState('')
+  const { isOpen: isAdvancedOpen, onOpen: onOpenAdvanced, onClose: onCloseAdvanced } = useDisclosure()
 
   useEffect(() => {
     changeIsUpdatingMacro(isEditing)
@@ -39,9 +41,10 @@ export default function Macroview({
           changeSearchValue={changeSearchValue}
           searchValue={searchValue}
         />
-        <SequencingArea onOpenMacroSettingsModal={onOpenMacroSettingsModal} />
+        <SequencingArea onOpenMacroSettingsModal={onOpenAdvanced} />
         <EditArea />
       </HStack>
+      <MacroAdvancedSettingsModal isOpen={isAdvancedOpen} onClose={onCloseAdvanced} />
     </VStack>
   )
 }

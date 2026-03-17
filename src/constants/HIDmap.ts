@@ -1008,6 +1008,7 @@ export class Hid {
       category: HIDCategory.Numpad,
       displayString: 'NP1',
       webKeyId: 'Numpad1',
+      colSpan: 2,
       whichID: 97,
       locationID: 3
     }
@@ -1019,6 +1020,7 @@ export class Hid {
       category: HIDCategory.Numpad,
       displayString: 'NP2',
       webKeyId: 'Numpad2',
+      colSpan: 2,
       whichID: 98,
       locationID: 3
     }
@@ -1030,6 +1032,7 @@ export class Hid {
       category: HIDCategory.Numpad,
       displayString: 'NP3',
       webKeyId: 'Numpad3',
+      colSpan: 2,
       whichID: 99,
       locationID: 3
     }
@@ -1041,6 +1044,7 @@ export class Hid {
       category: HIDCategory.Numpad,
       displayString: 'NP4',
       webKeyId: 'Numpad4',
+      colSpan: 2,
       whichID: 100,
       locationID: 3
     }
@@ -1052,6 +1056,7 @@ export class Hid {
       category: HIDCategory.Numpad,
       displayString: 'NP5',
       webKeyId: 'Numpad5',
+      colSpan: 2,
       whichID: 101,
       locationID: 3
     }
@@ -1063,6 +1068,7 @@ export class Hid {
       category: HIDCategory.Numpad,
       displayString: 'NP6',
       webKeyId: 'Numpad6',
+      colSpan: 2,
       whichID: 102,
       locationID: 3
     }
@@ -1074,6 +1080,7 @@ export class Hid {
       category: HIDCategory.Numpad,
       displayString: 'NP7',
       webKeyId: 'Numpad7',
+      colSpan: 2,
       whichID: 103,
       locationID: 3
     }
@@ -1085,6 +1092,7 @@ export class Hid {
       category: HIDCategory.Numpad,
       displayString: 'NP8',
       webKeyId: 'Numpad8',
+      colSpan: 2,
       whichID: 104,
       locationID: 3
     }
@@ -1096,6 +1104,7 @@ export class Hid {
       category: HIDCategory.Numpad,
       displayString: 'NP9',
       webKeyId: 'Numpad9',
+      colSpan: 2,
       whichID: 105,
       locationID: 3
     }
@@ -1107,6 +1116,7 @@ export class Hid {
       category: HIDCategory.Numpad,
       displayString: 'NP0',
       webKeyId: 'Numpad0',
+      colSpan: 2,
       whichID: 96,
       locationID: 3
     }
@@ -1220,123 +1230,149 @@ export class Hid {
     }
   }
 
+  static get CONTEXTMENU(): HidInfo {
+    return {
+      HIDcode: 101,
+      category: HIDCategory.Modifier,
+      displayString: 'Menu',
+      webKeyId: 'ContextMenu',
+      colSpan: 2,
+      whichID: 93
+    }
+  }
+
+  static get INTLBACKSLASH(): HidInfo {
+    return {
+      HIDcode: 100,
+      category: HIDCategory.Alphanumeric,
+      displayString: 'Intl \\',
+      webKeyId: 'IntlBackslash',
+      whichID: 226
+    }
+  }
+
+  static get VOLUMEMUTE(): HidInfo {
+    return {
+      HIDcode: 127,
+      category: HIDCategory.Media,
+      displayString: 'Vol Mute',
+      webKeyId: 'AudioVolumeMute',
+      colSpan: 2,
+      whichID: 173
+    }
+  }
+
+  static get VOLUMEUP(): HidInfo {
+    return {
+      HIDcode: 128,
+      category: HIDCategory.Media,
+      displayString: 'Vol Up',
+      webKeyId: 'AudioVolumeUp',
+      colSpan: 2,
+      whichID: 175
+    }
+  }
+
+  static get VOLUMEDOWN(): HidInfo {
+    return {
+      HIDcode: 129,
+      category: HIDCategory.Media,
+      displayString: 'Vol Down',
+      webKeyId: 'AudioVolumeDown',
+      colSpan: 2,
+      whichID: 174
+    }
+  }
+
+  static get MEDIANEXT(): HidInfo {
+    return {
+      HIDcode: 130,
+      category: HIDCategory.Media,
+      displayString: 'Next Track',
+      webKeyId: 'MediaTrackNext',
+      colSpan: 2,
+      whichID: 176
+    }
+  }
+
+  static get MEDIAPREV(): HidInfo {
+    return {
+      HIDcode: 131,
+      category: HIDCategory.Media,
+      displayString: 'Prev Track',
+      webKeyId: 'MediaTrackPrevious',
+      colSpan: 2,
+      whichID: 177
+    }
+  }
+
+  static get MEDIASTOP(): HidInfo {
+    return {
+      HIDcode: 132,
+      category: HIDCategory.Media,
+      displayString: 'Media Stop',
+      webKeyId: 'MediaStop',
+      colSpan: 2,
+      whichID: 178
+    }
+  }
+
+  static get MEDIAPLAYPAUSE(): HidInfo {
+    return {
+      HIDcode: 134,
+      category: HIDCategory.Media,
+      displayString: 'Play / Pause',
+      webKeyId: 'MediaPlayPause',
+      colSpan: 2,
+      whichID: 179
+    }
+  }
+
   static readonly all: HidInfo[] = [
-    Hid.A, //6510,
-    Hid.B, //6610,
-    Hid.C, //6710,
-    Hid.D, //6810,
-    Hid.E, //6910,
-    Hid.F, //7010,
-    Hid.G, //7110,
-    Hid.H, //7210,
-    Hid.I, //7310,
-    Hid.J, //7410,
-    Hid.K, //7510,
-    Hid.L, //7610,
-    Hid.M, //7710,
-    Hid.N, //7810,
-    Hid.O, //7910,
-    Hid.P, //8010,
-    Hid.Q, //8110,
-    Hid.R, //8210,
-    Hid.S, //8310,
-    Hid.T, //8410,
-    Hid.U, //8510,
-    Hid.V, //8610,
-    Hid.W, //8710,
-    Hid.X, //8810,
-    Hid.Y, //8910,
-    Hid.Z, //9010,
-    Hid.N0, //4810,
-    Hid.N1, //4910,
-    Hid.N2, //5010,
-    Hid.N3, //5110,
-    Hid.N4, //5210,
-    Hid.N5, //5310,
-    Hid.N6, //5410,
-    Hid.N7, //5510,
-    Hid.N8, //5610,
-    Hid.N9, //5710,
-    Hid.NP0, //9610,
-    Hid.NP1, //9710,
-    Hid.NP2, //9810,
-    Hid.NP3, //9910,
-    Hid.NP4, //10010,
-    Hid.NP5, //10110,
-    Hid.NP6, //10210,
-    Hid.NP7, //10310,
-    Hid.NP8, //10410,
-    Hid.NP9, //10510,
-    Hid.ENTER, //1310,
-    Hid.ESCAPE, //2710,
-    Hid.BACKSPACE, //810,
-    Hid.TAB, //910,
-    Hid.SPACE, //3210,
-    Hid.MINUS, //18910,
-    Hid.EQUAL, //18710,
-    Hid.BRACKETL, //21910,
-    Hid.BRACKETR, //22110,
-    Hid.BACKSLASH, //22010,
-    Hid.SEMICOLON, //18610,
-    Hid.QUOTE, //22210,
-    Hid.BACKQUOTE, //19210,
-    Hid.COMMA, //7710,
-    Hid.PERIOD, //18810,
-    Hid.CAPSLOCK, //2010,
-    Hid.SLASH, //19110,
-    Hid.F1, //11210,
-    Hid.F2, //11310,
-    Hid.F3, //11410,
-    Hid.F4, //11510,
-    Hid.F5, //11610,
-    Hid.F6, //11710,
-    Hid.F7, //11810,
-    Hid.F8, //11910,
-    Hid.F9, //12010,
-    Hid.F10, //12110,
-    Hid.F11, //12210,
-    Hid.F12, //12310,
-    Hid.F13, //12410,
-    Hid.F14, //12510,
-    Hid.F15, //12610,
-    Hid.F16, //12710,
-    Hid.F17, //12810,
-    Hid.F18, //12910,
-    Hid.F19, //13010,
-    Hid.F20, //13110,
-    Hid.F21, //13210,
-    Hid.F22, //13310,
-    Hid.F23, //13410,
-    Hid.F24, //13510,
-    Hid.PRINTSCREEN, //4410,
-    Hid.SCROLLLOCK, //14510,
-    Hid.PAUSE, //1910,
-    Hid.INSERT, //4510,
-    Hid.HOME, //3610,
-    Hid.PAGEUP, //3310,
-    Hid.DELETE, //4610,
-    Hid.END, //3510,
-    Hid.PAGEDOWN, //3410,
-    Hid.ARROWR, //3910,
-    Hid.ARROWL, //3710,
-    Hid.ARROWD, //4010,
-    Hid.ARROWU, //3810,
-    Hid.NUMLOCK, //14410,
-    Hid.NUMDIVIDE, //11110,
-    Hid.NUMMULTIPLY, //10610,
-    Hid.NUMSUBTRACT, //10910,
-    Hid.NUMADD, //10710,
-    Hid.NUMENTER, //1310,
-    Hid.NUMDECIMAL, //11010,
-    //
-    Hid.SHIFTL, //1611,
-    Hid.CONTROLL, //1711,
-    Hid.ALTL, //1811,
-    Hid.METAL, //9111,
-    Hid.SHIFTR, //1612,
-    Hid.CONTROLR, //1712,
-    Hid.METAR, //9212,
-    Hid.ALTR //1812,
+    // Alphanumeric — letters A–Z
+    Hid.A, Hid.B, Hid.C, Hid.D, Hid.E, Hid.F, Hid.G, Hid.H, Hid.I,
+    Hid.J, Hid.K, Hid.L, Hid.M, Hid.N, Hid.O, Hid.P, Hid.Q, Hid.R,
+    Hid.S, Hid.T, Hid.U, Hid.V, Hid.W, Hid.X, Hid.Y, Hid.Z,
+    // Alphanumeric — digit row (1–0)
+    Hid.N1, Hid.N2, Hid.N3, Hid.N4, Hid.N5,
+    Hid.N6, Hid.N7, Hid.N8, Hid.N9, Hid.N0,
+    // Alphanumeric — symbols (keyboard layout order)
+    Hid.MINUS, Hid.EQUAL,
+    Hid.BRACKETL, Hid.BRACKETR, Hid.BACKSLASH,
+    Hid.SEMICOLON, Hid.QUOTE, Hid.BACKQUOTE,
+    Hid.COMMA, Hid.PERIOD, Hid.SLASH,
+    // Alphanumeric — special keys
+    Hid.ESCAPE, Hid.TAB, Hid.CAPSLOCK, Hid.SPACE,
+    Hid.ENTER, Hid.BACKSPACE,
+    // Alphanumeric — ISO only
+    Hid.INTLBACKSLASH,
+
+    // Function — F1–F24
+    Hid.F1, Hid.F2, Hid.F3, Hid.F4, Hid.F5, Hid.F6,
+    Hid.F7, Hid.F8, Hid.F9, Hid.F10, Hid.F11, Hid.F12,
+    Hid.F13, Hid.F14, Hid.F15, Hid.F16, Hid.F17, Hid.F18,
+    Hid.F19, Hid.F20, Hid.F21, Hid.F22, Hid.F23, Hid.F24,
+
+    // Modifier — left side, right side, then lock/special
+    Hid.SHIFTL, Hid.CONTROLL, Hid.ALTL, Hid.METAL,
+    Hid.SHIFTR, Hid.CONTROLR, Hid.ALTR, Hid.METAR,
+    Hid.PRINTSCREEN, Hid.SCROLLLOCK, Hid.PAUSE, Hid.CONTEXTMENU,
+
+    // Navigation — cluster (Insert/Del/Home/End/PgUp/PgDn), then arrows
+    Hid.INSERT, Hid.HOME, Hid.PAGEUP,
+    Hid.DELETE, Hid.END, Hid.PAGEDOWN,
+    Hid.ARROWU,
+    Hid.ARROWL, Hid.ARROWD, Hid.ARROWR,
+
+    // Numpad — sequential order
+    Hid.NUMLOCK, Hid.NUMDIVIDE, Hid.NUMMULTIPLY, Hid.NUMSUBTRACT, Hid.NUMADD,
+    Hid.NP0, Hid.NP1, Hid.NP2, Hid.NP3, Hid.NP4,
+    Hid.NP5, Hid.NP6, Hid.NP7, Hid.NP8, Hid.NP9,
+    Hid.NUMENTER, Hid.NUMDECIMAL,
+
+    // Media — volume then transport controls
+    Hid.VOLUMEDOWN, Hid.VOLUMEMUTE, Hid.VOLUMEUP,
+    Hid.MEDIAPREV, Hid.MEDIAPLAYPAUSE, Hid.MEDIASTOP, Hid.MEDIANEXT,
   ]
 }
 

@@ -15,6 +15,7 @@ use std::time;
 pub enum MouseAction {
     Press { data: MousePressAction },
     Move { x: i32, y: i32 },
+    Scroll { delta_x: i32, delta_y: i32 },
 }
 
 #[derive(
@@ -29,6 +30,9 @@ pub enum MouseButton {
     Middle = 0x103,
     Mouse4 = 0x104,
     Mouse5 = 0x105,
+    Mouse6 = 0x106,
+    Mouse7 = 0x107,
+    Mouse8 = 0x108,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Hash, Eq)]
@@ -71,6 +75,63 @@ impl MouseAction {
                     x: *x as f64,
                     y: *y as f64,
                 })?;
+            }
+
+            MouseAction::Scroll { delta_x, delta_y } => {
+                #[cfg(target_os = "windows")]
+                {
+                    use std::mem;
+                    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+                        SendInput, INPUT, INPUT_0, INPUT_MOUSE, MOUSEINPUT,
+                    };
+                    const MOUSEEVENTF_WHEEL: u32 = 0x0800;
+                    const MOUSEEVENTF_HWHEEL: u32 = 0x1000;
+                    // Windows WHEEL: positive mouseData = scroll up.
+                    // Our delta_y: negative = scroll up → negate.
+                    if *delta_y != 0 {
+                        let wheel_data = (-(*delta_y)) * 120;
+                        let input = INPUT {
+                            r#type: INPUT_MOUSE,
+                            Anonymous: INPUT_0 {
+                                mi: MOUSEINPUT {
+                                    dx: 0,
+                                    dy: 0,
+                                    mouseData: wheel_data,
+                                    dwFlags: MOUSEEVENTF_WHEEL,
+                                    time: 0,
+                                    dwExtraInfo: 0,
+                                },
+                            },
+                        };
+                        unsafe { SendInput(1, &input, mem::size_of::<INPUT>() as i32); }
+                    }
+                    // Windows HWHEEL: positive mouseData = scroll right.
+                    // Our delta_x: positive = scroll right → same sign.
+                    if *delta_x != 0 {
+                        let wheel_data = *delta_x * 120;
+                        let input = INPUT {
+                            r#type: INPUT_MOUSE,
+                            Anonymous: INPUT_0 {
+                                mi: MOUSEINPUT {
+                                    dx: 0,
+                                    dy: 0,
+                                    mouseData: wheel_data,
+                                    dwFlags: MOUSEEVENTF_HWHEEL,
+                                    time: 0,
+                                    dwExtraInfo: 0,
+                                },
+                            },
+                        };
+                        unsafe { SendInput(1, &input, mem::size_of::<INPUT>() as i32); }
+                    }
+                }
+                #[cfg(not(target_os = "windows"))]
+                {
+                    send_channel.send(rdev::EventType::Wheel {
+                        delta_x: *delta_x as i64,
+                        delta_y: *delta_y as i64,
+                    })?;
+                }
             }
         }
         Ok(())

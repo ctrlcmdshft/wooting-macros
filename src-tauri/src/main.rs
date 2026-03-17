@@ -27,7 +27,9 @@ const DEBUG_ENVVAR: &str = "MACRO_LOG_LEVEL";
 /// Gets the application config from the current state and sends to frontend.
 /// The state gets it from the config file at bootup.
 async fn get_config(state: tauri::State<'_, MacroBackend>) -> Result<ApplicationConfig, ()> {
-    Ok(state.config.read().await.clone())
+    let mut config = state.config.read().await.clone();
+    config.record_mouse_movement = false;
+    Ok(config)
 }
 
 #[tauri::command]
@@ -81,6 +83,20 @@ async fn control_grabbing(
     frontend_bool: bool,
 ) -> Result<(), ()> {
     state.set_is_listening(frontend_bool);
+    Ok(())
+}
+
+#[tauri::command]
+/// Starts global recording mode — backend emits all key/mouse events to the frontend.
+async fn start_recording(state: tauri::State<'_, MacroBackend>) -> Result<(), ()> {
+    state.start_recording();
+    Ok(())
+}
+
+#[tauri::command]
+/// Stops global recording mode and re-enables macro execution.
+async fn stop_recording(state: tauri::State<'_, MacroBackend>) -> Result<(), ()> {
+    state.stop_recording();
     Ok(())
 }
 
@@ -160,13 +176,18 @@ async fn main() -> Result<(), Error> {
             get_config,
             set_config,
             control_grabbing,
-            is_debug
+            is_debug,
+            start_recording,
+            stop_recording
         ])
         .setup(move |app| {
             let app_name = &app.package_info().name;
             init_autostart(&app_name, set_autolaunch).unwrap_or_else(|err| {
                 error!("error changing the autostart options: {}", err.to_string())
             });
+
+            let state: tauri::State<MacroBackend> = app.state();
+            state.set_app_handle(app.handle());
 
             Ok(())
         })

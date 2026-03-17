@@ -14,6 +14,9 @@ pub static ref BUTTON_TO_HID: HashMap<Button, u32> = {
         scancode.insert(Button::Middle, 0x103);
         scancode.insert(Button::Forward, 0x104);
         scancode.insert(Button::Backward, 0x105);
+        scancode.insert(Button::Unknown(0), 0x106);
+        scancode.insert(Button::Unknown(1), 0x107);
+        scancode.insert(Button::Unknown(2), 0x108);
         scancode
 };}
 
@@ -25,6 +28,9 @@ impl From<&Button> for MouseButton {
             Button::Middle => MouseButton::Middle,
             Button::Forward => MouseButton::Mouse4,
             Button::Backward => MouseButton::Mouse5,
+            Button::Unknown(0) => MouseButton::Mouse6,
+            Button::Unknown(1) => MouseButton::Mouse7,
+            Button::Unknown(2) => MouseButton::Mouse8,
             Button::Unknown(_) => MouseButton::Left,
         }
     }
@@ -38,6 +44,9 @@ impl From<&MouseButton> for Button {
             MouseButton::Middle => Button::Middle,
             MouseButton::Mouse4 => Button::Forward,
             MouseButton::Mouse5 => Button::Backward,
+            MouseButton::Mouse6 => Button::Unknown(0),
+            MouseButton::Mouse7 => Button::Unknown(1),
+            MouseButton::Mouse8 => Button::Unknown(2),
         }
     }
 }
@@ -50,6 +59,9 @@ impl From<&MouseButton> for u32 {
             MouseButton::Middle => 0x103,
             MouseButton::Mouse4 => 0x104,
             MouseButton::Mouse5 => 0x105,
+            MouseButton::Mouse6 => 0x106,
+            MouseButton::Mouse7 => 0x107,
+            MouseButton::Mouse8 => 0x108,
         }
     }
 }
@@ -161,6 +173,10 @@ pub static ref SCANCODE_TO_RDEV: HashMap<u32, Key> = {
         scancode.insert(0x7f, Key::VolumeMute); //VOLUME_MUTE
         scancode.insert(0x81, Key::VolumeDown); //VOLUME_DOWN
         scancode.insert(0x80, Key::VolumeUp); //VOLUME_UP
+        scancode.insert(0x82, Key::Unknown(176)); //MEDIA_NEXT_TRACK (VK 0xB0)
+        scancode.insert(0x83, Key::Unknown(177)); //MEDIA_PREV_TRACK (VK 0xB1)
+        scancode.insert(0x84, Key::Unknown(178)); //MEDIA_STOP (VK 0xB2)
+        scancode.insert(0x86, Key::Unknown(179)); //MEDIA_PLAY_PAUSE (VK 0xB3)
 
         scancode.insert(0x46, Key::PrintScreen); //PRINT_SCREEN
         scancode.insert(0x47, Key::ScrollLock); //SCROLL_LOCK
@@ -335,6 +351,10 @@ pub static ref SCANCODE_TO_HID: HashMap<Key, u32> = {
         scancode.insert(Key::VolumeMute, 0x7f); //VOLUME_MUTE
         scancode.insert(Key::VolumeDown, 0x81); //VOLUME_DOWN
         scancode.insert(Key::VolumeUp, 0x80); //VOLUME_UP
+        scancode.insert(Key::Unknown(176), 0x82); //MEDIA_NEXT_TRACK
+        scancode.insert(Key::Unknown(177), 0x83); //MEDIA_PREV_TRACK
+        scancode.insert(Key::Unknown(178), 0x84); //MEDIA_STOP
+        scancode.insert(Key::Unknown(179), 0x86); //MEDIA_PLAY_PAUSE
 
         scancode.insert(Key::PrintScreen, 0x46); //PRINT_SCREEN
         scancode.insert(Key::ScrollLock, 0x47); //SCROLL_LOCK

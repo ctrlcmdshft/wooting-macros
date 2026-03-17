@@ -14,6 +14,7 @@ import { AppState, Collection, CurrentSelection, MacroData } from '../types'
 import { isDebug, updateBackendConfig } from '../constants/utils'
 import { error } from 'tauri-plugin-log'
 import { invoke } from '@tauri-apps/api'
+import { listen } from '@tauri-apps/api/event'
 
 interface ApplicationProviderProps {
   children: ReactNode
@@ -93,6 +94,17 @@ function ApplicationProvider({ children }: ApplicationProviderProps) {
         })
       })
   }, [collections, initComplete, toast])
+
+  useEffect(() => {
+    const unlisten = listen<number>('collection_toggled', (event) => {
+      setCollections((prev) =>
+        prev.map((col, i) =>
+          i === event.payload ? { ...col, active: !col.active } : col
+        )
+      )
+    })
+    return () => { unlisten.then((fn) => fn()) }
+  }, [])
 
   const changeViewState = useCallback(
     (newState: ViewState) => {

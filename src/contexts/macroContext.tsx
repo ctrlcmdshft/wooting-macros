@@ -42,7 +42,12 @@ const macroDefault: Macro = {
   macro_type: 'Single',
   trigger: { type: 'KeyPressEvent', data: [], allow_while_other_keys: false },
   sequence: [],
-  loop_count: null
+  loop_count: null,
+  startup_delay: null,
+  playback_speed: null,
+  abort_key: null,
+  suppress_trigger_key: true,
+  trigger_on_release: false
 }
 
 function MacroProvider({ children }: MacroProviderProps) {
@@ -79,8 +84,9 @@ function MacroProvider({ children }: MacroProviderProps) {
         (element): element is MouseEventAction =>
           element.type === 'MouseEventAction'
       )
-      .filter((element: MouseEventAction) => element.data.type === 'Press')
-      .map((element: MouseEventAction) => element.data.type === 'Press' ? element.data.data.button : undefined)
+      .flatMap((element: MouseEventAction) =>
+        element.data.type === 'Press' ? [element.data.data.button] : []
+      )
   }, [sequence])
 
   const willCauseTriggerLooping = useMemo(() => {
@@ -186,6 +192,41 @@ function MacroProvider({ children }: MacroProviderProps) {
   const updateLoopCount = useCallback(
     (count: number | null) => {
       setMacro({ ...macro, loop_count: count })
+    },
+    [macro, setMacro]
+  )
+
+  const updateStartupDelay = useCallback(
+    (value: number | null) => {
+      setMacro({ ...macro, startup_delay: value })
+    },
+    [macro, setMacro]
+  )
+
+  const updatePlaybackSpeed = useCallback(
+    (value: number | null) => {
+      setMacro({ ...macro, playback_speed: value })
+    },
+    [macro, setMacro]
+  )
+
+  const updateAbortKey = useCallback(
+    (value: number | null) => {
+      setMacro({ ...macro, abort_key: value })
+    },
+    [macro, setMacro]
+  )
+
+  const updateSuppressTriggerKey = useCallback(
+    (value: boolean) => {
+      setMacro({ ...macro, suppress_trigger_key: value })
+    },
+    [macro, setMacro]
+  )
+
+  const updateTriggerOnRelease = useCallback(
+    (value: boolean) => {
+      setMacro({ ...macro, trigger_on_release: value })
     },
     [macro, setMacro]
   )
@@ -365,6 +406,11 @@ function MacroProvider({ children }: MacroProviderProps) {
       updateMacroIcon,
       updateMacroType,
       updateLoopCount,
+      updateStartupDelay,
+      updatePlaybackSpeed,
+      updateAbortKey,
+      updateSuppressTriggerKey,
+      updateTriggerOnRelease,
       updateTrigger,
       updateAllowWhileOtherKeys,
       onElementAdd,
@@ -392,6 +438,11 @@ function MacroProvider({ children }: MacroProviderProps) {
       updateMacroIcon,
       updateMacroType,
       updateLoopCount,
+      updateStartupDelay,
+      updatePlaybackSpeed,
+      updateAbortKey,
+      updateSuppressTriggerKey,
+      updateTriggerOnRelease,
       updateTrigger,
       updateAllowWhileOtherKeys,
       onElementAdd,

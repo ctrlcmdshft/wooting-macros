@@ -1,9 +1,10 @@
-import { DeleteIcon } from '@chakra-ui/icons'
+import { CloseIcon, DeleteIcon } from '@chakra-ui/icons'
 import {
   Box,
   Button,
   Flex,
   HStack,
+  IconButton,
   Input,
   Text,
   Tooltip,
@@ -18,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import EmojiPopover from '../EmojiPopover'
 import useMainBgColour from '../../hooks/useMainBgColour'
 import useBorderColour from '../../hooks/useBorderColour'
+import { HIDLookup, webCodeLocationHidEncode, webCodeLocationHIDLookup } from '../../constants/HIDmap'
 
 interface Props {
   searchValue: string
@@ -42,7 +44,30 @@ export default function CollectionPanel({ searchValue }: Props) {
     onClose: onEmojiPopoverClose
   } = useDisclosure()
   const [collectionName, setCollectionName] = useState('')
+  const [listeningForToggleKey, setListeningForToggleKey] = useState(false)
   const borderColour = useBorderColour()
+
+  const toggleKeyName = currentCollection.toggle_key
+    ? HIDLookup.get(currentCollection.toggle_key)?.displayString ?? `HID ${currentCollection.toggle_key}`
+    : 'Not set'
+
+  const onCaptureToggleKey = useCallback(
+    (e: KeyboardEvent) => {
+      e.preventDefault()
+      const hidInfo = webCodeLocationHIDLookup.get(webCodeLocationHidEncode(e.which, e.location))
+      if (hidInfo) {
+        onCollectionUpdate({ ...currentCollection, toggle_key: hidInfo.HIDcode }, selection.collectionIndex)
+      }
+      setListeningForToggleKey(false)
+    },
+    [currentCollection, onCollectionUpdate, selection.collectionIndex]
+  )
+
+  useEffect(() => {
+    if (!listeningForToggleKey) return
+    window.addEventListener('keydown', onCaptureToggleKey, true)
+    return () => window.removeEventListener('keydown', onCaptureToggleKey, true)
+  }, [listeningForToggleKey, onCaptureToggleKey])
   const isCollectionUndeletable = collections.length <= 1
   const isSearching: boolean = useMemo((): boolean => {
     return searchValue.length !== 0
@@ -132,6 +157,45 @@ export default function CollectionPanel({ searchValue }: Props) {
               />
             </HStack>
             <HStack w="fit">
+              <HStack spacing={1}>
+                <Tooltip
+                  variant="brand"
+                  label={
+                    listeningForToggleKey
+                      ? 'Press any key to assign it as the toggle shortcut'
+                      : currentCollection.toggle_key != null
+                      ? `Toggle shortcut: ${toggleKeyName} — press to reassign. This key enables/disables the collection while the app runs.`
+                      : 'Assign a key to toggle this collection on/off while the app is running'
+                  }
+                  hasArrow
+                  placement="bottom"
+                >
+                  <Button
+                    variant="brandRecord"
+                    size="sm"
+                    isActive={listeningForToggleKey}
+                    onClick={() => setListeningForToggleKey(true)}
+                    minW="90px"
+                  >
+                    {listeningForToggleKey
+                      ? 'Press a key...'
+                      : currentCollection.toggle_key != null
+                      ? toggleKeyName
+                      : 'Toggle key'}
+                  </Button>
+                </Tooltip>
+                {currentCollection.toggle_key != null && (
+                  <Tooltip variant="brand" label="Remove toggle shortcut" hasArrow placement="bottom">
+                    <IconButton
+                      aria-label="Remove toggle shortcut"
+                      icon={<CloseIcon boxSize={2} />}
+                      variant="brandWarning"
+                      size="sm"
+                      onClick={() => onCollectionUpdate({ ...currentCollection, toggle_key: null }, selection.collectionIndex)}
+                    />
+                  </Tooltip>
+                )}
+              </HStack>
               {/* <Button leftIcon={<AddIcon />} size={['xs', 'sm', 'md']} isDisabled>
               Export Collection
             </Button>

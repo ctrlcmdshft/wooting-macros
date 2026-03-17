@@ -1,5 +1,6 @@
 import { useColorMode, useToast } from '@chakra-ui/react'
 import { invoke } from '@tauri-apps/api'
+import { appWindow } from '@tauri-apps/api/window'
 import {
   createContext,
   ReactNode,
@@ -35,7 +36,10 @@ function SettingsProvider({ children }: SettingsProviderProps) {
     AutoSelectElement: true,
     MinimizeAtLaunch: false,
     Theme: 'light',
-    MinimizeToTray: true
+    MinimizeToTray: true,
+    RecordingHotkey: undefined,
+    RecordMouseMovement: false,
+    AlwaysOnTop: false,
   })
   const toast = useToast()
 
@@ -46,6 +50,7 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       .then((res) => {
         setConfig(res)
         setInitComplete(true)
+        appWindow.setAlwaysOnTop(res.AlwaysOnTop).catch(() => {})
       })
       .catch((e) => {
         error(e)
@@ -111,6 +116,21 @@ function SettingsProvider({ children }: SettingsProviderProps) {
     [setColorMode]
   )
 
+  const updateRecordingHotkey = useCallback((value: number | undefined) => {
+    setConfig((config) => {
+      return { ...config, RecordingHotkey: value }
+    })
+  }, [])
+
+  const updateRecordMouseMovement = useCallback((value: boolean) => {
+    setConfig((config) => ({ ...config, RecordMouseMovement: value }))
+  }, [])
+
+  const updateAlwaysOnTop = useCallback((value: boolean) => {
+    setConfig((config) => ({ ...config, AlwaysOnTop: value }))
+    appWindow.setAlwaysOnTop(value).catch(() => {})
+  }, [])
+
   const value = useMemo<SettingsState>(
     () => ({
       config,
@@ -120,7 +140,10 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       updateAutoAddDelay,
       updateDefaultDelayVal,
       updateAutoSelectElement,
-      updateTheme
+      updateTheme,
+      updateRecordingHotkey,
+      updateRecordMouseMovement,
+      updateAlwaysOnTop,
     }),
     [
       config,
@@ -130,7 +153,10 @@ function SettingsProvider({ children }: SettingsProviderProps) {
       updateAutoAddDelay,
       updateDefaultDelayVal,
       updateAutoSelectElement,
-      updateTheme
+      updateTheme,
+      updateRecordingHotkey,
+      updateRecordMouseMovement,
+      updateAlwaysOnTop,
     ]
   )
 

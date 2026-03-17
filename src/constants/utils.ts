@@ -71,12 +71,20 @@ export function checkIfKeyShouldContinueTriggerRecording(hid: number): boolean {
 }
 
 export const checkIfElementIsEditable = (element: ActionEventType): boolean => {
+  if (element.type === 'MousePathEventAction') {
+    return false
+  }
   if (element.type === 'SystemEventAction') {
     switch (element.data.type) {
       case 'Open':
         return true
       case 'Clipboard':
-        if (element.data.action.type === 'PasteUserDefinedString') {
+        if (
+          element.data.action.type === 'PasteUserDefinedString' ||
+          element.data.action.type === 'TypeText' ||
+          element.data.action.type === 'TextTransform' ||
+          element.data.action.type === 'TextEffect'
+        ) {
           return true
         }
         return false
@@ -95,12 +103,19 @@ export const getElementDisplayString = (element: ActionEventType): string => {
     case 'DelayEventAction':
       return element.data.toString() + ' ms'
     case 'MouseEventAction':
-      if (element.data.type === 'Move') {
-        return `Mouse Move (${element.data.x}, ${element.data.y})`
+      if (element.data.type === 'Scroll') {
+        const { delta_x, delta_y } = element.data
+        if (delta_y < 0) return `Scroll Up (${Math.abs(delta_y)})`
+        if (delta_y > 0) return `Scroll Down (${delta_y})`
+        if (delta_x < 0) return `Scroll Left (${Math.abs(delta_x)})`
+        if (delta_x > 0) return `Scroll Right (${delta_x})`
+        return 'Scroll'
       }
       return (
         mouseEnumLookup.get(element.data.data.button)?.displayString || 'error'
       )
+    case 'MousePathEventAction':
+      return `Mouse Path (${element.data.length} pts)`
     case 'SystemEventAction':
       switch (element.data.type) {
         case 'Open':
@@ -125,11 +140,29 @@ export const getElementDisplayString = (element: ActionEventType): string => {
           ) {
             return 'Paste Text: ' + element.data.action.data
           }
+          if (
+            element.data.action.type === 'TypeText' &&
+            element.data.action.data !== ''
+          ) {
+            return 'Type Text: ' + element.data.action.data
+          }
+          if (element.data.action.type === 'TextTransform') {
+            switch (element.data.action.variant) {
+              case 'uppercase': return 'UPPERCASE'
+              case 'lowercase': return 'lowercase'
+              case 'titlecase': return 'Title Case'
+              case 'repeat': return `Repeat (${element.data.action.count ?? 2}x)`
+            }
+          }
+          if (element.data.action.type === 'TextEffect') {
+            const v = element.data.action.variant
+            return v.charAt(0).toUpperCase() + v.slice(1)
+          }
           return (
             sysEventLookup.get(element.data.action.type)?.displayString ||
             'error'
           )
-        default:
+          default:
           return 'error'
       }
   }

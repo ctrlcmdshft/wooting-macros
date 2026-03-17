@@ -6,8 +6,8 @@ import useMainBgColour from '../../../hooks/useMainBgColour'
 import DelayForm from './editForms/DelayForm'
 import EmptyForm from './editForms/EmptyForm'
 import KeyPressForm from './editForms/KeyPressForm'
-import MouseMoveForm from './editForms/MouseMoveForm'
 import MousePressForm from './editForms/MousePressForm'
+import MouseScrollForm from './editForms/MouseScrollForm'
 import SystemEventActionForm from './editForms/SystemEventActionForm'
 
 export function BoxText({ children }: { children: string }) {
@@ -72,9 +72,9 @@ export default function EditArea() {
           />
         )
       case 'MouseEventAction':
-        if (selectedElement.data.type === 'Move') {
+        if (selectedElement.data.type === 'Scroll') {
           return (
-            <MouseMoveForm
+            <MouseScrollForm
               selectedElementId={selectedElementId}
               selectedElement={selectedElement}
             />

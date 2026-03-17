@@ -11,6 +11,50 @@ use url::Url;
 
 use super::util;
 
+#[cfg(target_os = "windows")]
+async fn type_text_unicode(text: &str, delay_ms: u32) -> Result<()> {
+    use std::mem;
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::*;
+
+    for c in text.chars() {
+        let mut buf = [0u16; 2];
+        let len = c.encode_utf16(&mut buf).len();
+
+        let mut inputs = Vec::new();
+        for &scan in &buf[..len] {
+            inputs.push(INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: 0,
+                        wScan: scan,
+                        dwFlags: KEYEVENTF_UNICODE,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            });
+            inputs.push(INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: 0,
+                        wScan: scan,
+                        dwFlags: KEYEVENTF_UNICODE | KEYEVENTF_KEYUP,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
+            });
+        }
+        unsafe {
+            SendInput(inputs.len() as u32, inputs.as_ptr(), mem::size_of::<INPUT>() as i32);
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(delay_ms as u64)).await;
+    }
+    Ok(())
+}
+
 // Frequently used keys within the code.
 const COPY_HOTKEY: [rdev::Key; 2] = [rdev::Key::ControlLeft, rdev::Key::KeyC];
 const PASTE_HOTKEY: [rdev::Key; 2] = [rdev::Key::ControlLeft, rdev::Key::KeyV];
@@ -100,6 +144,28 @@ impl SystemAction {
                     }
                 }
 
+                ClipboardAction::TypeText { data, delay_ms } => {
+                    if data.is_empty() {
+                        return Ok(());
+                    }
+                    #[cfg(target_os = "windows")]
+                    type_text_unicode(data, *delay_ms).await?;
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        // Fallback on non-Windows: use clipboard paste
+                        let mut ctx = ClipboardContext::new()
+                            .map_err(|err| anyhow::Error::msg(err.to_string()))?;
+                        let previous_content = ctx.get_contents().ok();
+                        ctx.set_contents(data.to_owned())
+                            .map_err(|err| anyhow::Error::msg(err.to_string()))?;
+                        util::direct_send_hotkey(&send_channel, PASTE_HOTKEY.to_vec()).await?;
+                        tokio::time::sleep(time::Duration::from_millis(50)).await;
+                        if let Some(prev) = previous_content {
+                            ctx.set_contents(prev).unwrap_or(());
+                        }
+                    }
+                }
+
                 ClipboardAction::Sarcasm => {
                     let mut ctx = ClipboardContext::new()
                         .map_err(|err| anyhow::Error::msg(err.to_string()))?;
@@ -120,6 +186,70 @@ impl SystemAction {
                         .map_err(|err| anyhow::Error::msg(err.to_string()))?;
 
                     // Paste the text again
+                    util::direct_send_hotkey(&send_channel, PASTE_HOTKEY.to_vec()).await?;
+                }
+
+                ClipboardAction::TextTransform { variant, count } => {
+                    let mut ctx = ClipboardContext::new()
+                        .map_err(|err| anyhow::Error::msg(err.to_string()))?;
+
+                    util::direct_send_hotkey(&send_channel, COPY_HOTKEY.to_vec()).await?;
+                    tokio::time::sleep(time::Duration::from_millis(10)).await;
+
+                    let content = ctx.get_contents()
+                        .map_err(|err| anyhow::Error::msg(err.to_string()))?;
+
+                    let transformed = match variant.as_str() {
+                        "uppercase" => content.to_uppercase(),
+                        "lowercase" => content.to_lowercase(),
+                        "titlecase" => content.split_whitespace()
+                            .map(|word| {
+                                let mut chars = word.chars();
+                                match chars.next() {
+                                    None => String::new(),
+                                    Some(first) => {
+                                        let upper: String = first.to_uppercase().collect();
+                                        upper + chars.as_str()
+                                    }
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" "),
+                        "repeat" => content.repeat(count.unwrap_or(2) as usize),
+                        _ => content,
+                    };
+
+                    ctx.set_contents(transformed)
+                        .map_err(|err| anyhow::Error::msg(err.to_string()))?;
+                    util::direct_send_hotkey(&send_channel, PASTE_HOTKEY.to_vec()).await?;
+                }
+
+                ClipboardAction::TextEffect { variant } => {
+                    let mut ctx = ClipboardContext::new()
+                        .map_err(|err| anyhow::Error::msg(err.to_string()))?;
+
+                    util::direct_send_hotkey(&send_channel, COPY_HOTKEY.to_vec()).await?;
+                    tokio::time::sleep(time::Duration::from_millis(10)).await;
+
+                    let content = ctx.get_contents()
+                        .map_err(|err| anyhow::Error::msg(err.to_string()))?;
+
+                    let transformed = match variant.as_str() {
+                        "sarcasm" => transform_text(content),
+                        "reverse" => content.chars().rev().collect(),
+                        "leetspeak" => content.chars().map(|c| match c {
+                            'e' | 'E' => '3',
+                            'a' | 'A' => '4',
+                            'i' | 'I' => '1',
+                            'o' | 'O' => '0',
+                            't' | 'T' => '7',
+                            _ => c,
+                        }).collect(),
+                        _ => content,
+                    };
+
+                    ctx.set_contents(transformed)
+                        .map_err(|err| anyhow::Error::msg(err.to_string()))?;
                     util::direct_send_hotkey(&send_channel, PASTE_HOTKEY.to_vec()).await?;
                 }
             },
@@ -154,7 +284,10 @@ pub enum ClipboardAction {
     GetClipboard,
     Paste,
     PasteUserDefinedString { data: String },
+    TypeText { data: String, delay_ms: u32 },
     Sarcasm,
+    TextTransform { variant: String, #[serde(default)] count: Option<u32> },
+    TextEffect { variant: String },
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Hash, Eq)]

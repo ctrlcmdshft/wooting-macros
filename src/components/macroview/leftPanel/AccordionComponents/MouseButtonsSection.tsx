@@ -5,7 +5,7 @@ import {
   AccordionPanel,
   AspectRatio,
   Flex,
-  SimpleGrid
+  SimpleGrid,
 } from '@chakra-ui/react'
 import { MouseInputInfo } from '../../../../constants/MouseMap'
 import { MouseIcon } from '../../../icons'
@@ -65,11 +65,9 @@ export default function MouseButtonsSection({ elementsToRender }: Props) {
           ))}
           <AspectRatio ratio={2 / 0.75}>
             <SelectElementButton
-              nameText="Mouse Move"
-              properties={{
-                type: 'MouseEventAction',
-                data: { type: 'Move', x: 0, y: 0 }
-              }}
+              nameText="Scroll"
+              descText="Scroll the mouse wheel (configure direction and amount in the edit panel)"
+              properties={{ type: 'MouseEventAction', data: { type: 'Scroll', delta_x: 0, delta_y: -3 } }}
             />
           </AspectRatio>
         </SimpleGrid>

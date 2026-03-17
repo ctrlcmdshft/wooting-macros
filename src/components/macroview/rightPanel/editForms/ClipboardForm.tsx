@@ -2,6 +2,11 @@ import {
   Box,
   Divider,
   HStack,
+  NumberDecrementStepper,
+  NumberIncrementStepper,
+  NumberInput,
+  NumberInputField,
+  NumberInputStepper,
   Text,
   Textarea,
   useColorMode,
@@ -25,6 +30,7 @@ export default function ClipboardForm({
 }: Props) {
   const pickerRef = useRef<HTMLDivElement | null>(null)
   const [text, setText] = useState('')
+  const [delayMs, setDelayMs] = useState(30)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const { updateElement } = useMacroContext()
   const { colorMode } = useColorMode()
@@ -32,13 +38,13 @@ export default function ClipboardForm({
   const kebabColour = useColorModeValue('primary-light.500', 'primary-dark.500')
 
   useEffect(() => {
-    if (
-      selectedElement.data.type !== 'Clipboard' ||
-      selectedElement.data.action.type !== 'PasteUserDefinedString'
-    )
-      return
-
-    setText(selectedElement.data.action.data)
+    if (selectedElement.data.type !== 'Clipboard') return
+    const action = selectedElement.data.action
+    if (action.type !== 'PasteUserDefinedString' && action.type !== 'TypeText') return
+    setText(action.data)
+    if (action.type === 'TypeText') {
+      setDelayMs(action.delay_ms)
+    }
   }, [selectedElement])
 
   const handleClickOutside = useCallback(
@@ -76,45 +82,47 @@ export default function ClipboardForm({
     [setText]
   )
 
+  const actionType = selectedElement.data.type === 'Clipboard' &&
+    (selectedElement.data.action.type === 'TypeText' ? 'TypeText' : 'PasteUserDefinedString')
+
   const onInputBlur = useCallback(() => {
+    const action =
+      actionType === 'TypeText'
+        ? { type: 'TypeText' as const, data: text, delay_ms: delayMs }
+        : { type: 'PasteUserDefinedString' as const, data: text }
     const temp: SystemEventAction = {
       ...selectedElement,
-      data: {
-        type: 'Clipboard',
-        action: { type: 'PasteUserDefinedString', data: text }
-      }
+      data: { type: 'Clipboard', action }
     }
     updateElement(temp, selectedElementId)
-  }, [selectedElement, selectedElementId, text, updateElement])
+  }, [actionType, delayMs, selectedElement, selectedElementId, text, updateElement])
 
   const onEmojiSelect = useCallback(
     (emoji: { native: string }) => {
       const newString = text + emoji.native
       setText(newString)
+      const action =
+        actionType === 'TypeText'
+          ? { type: 'TypeText' as const, data: newString, delay_ms: delayMs }
+          : { type: 'PasteUserDefinedString' as const, data: newString }
       const temp: SystemEventAction = {
         ...selectedElement,
-        data: {
-          type: 'Clipboard',
-          action: {
-            type: 'PasteUserDefinedString',
-            data: newString
-          }
-        }
+        data: { type: 'Clipboard', action }
       }
       updateElement(temp, selectedElementId)
     },
-    [selectedElement, selectedElementId, text, updateElement]
+    [actionType, delayMs, selectedElement, selectedElementId, text, updateElement]
   )
 
   return (
     <>
       <HStack justifyContent="center" p={1}>
-        <BoxText>Clipboard</BoxText>
+        <BoxText>{actionType === 'TypeText' ? 'Type Text' : 'Clipboard'}</BoxText>
       </HStack>
       <Divider />
       <HStack w="full" justifyContent="space-between">
         <Text fontSize={['xs', 'sm', 'md']} fontWeight="semibold">
-          Text to paste
+          {actionType === 'TypeText' ? 'Text to type' : 'Text to paste'}
         </Text>
         <Box
           filter={showEmojiPicker ? 'grayscale(0%)' : 'grayscale(100%)'}
@@ -133,6 +141,36 @@ export default function ClipboardForm({
         onBlur={onInputBlur}
         placeholder="e.g. glhf <3"
       />
+      {actionType === 'TypeText' && (
+        <HStack w="full" justifyContent="space-between">
+          <Text fontSize={['xs', 'sm', 'md']} fontWeight="semibold">
+            Delay per character (ms)
+          </Text>
+          <NumberInput
+            size="sm"
+            w="80px"
+            min={0}
+            max={1000}
+            value={delayMs}
+            onChange={(_, val) => {
+              const next = isNaN(val) ? 0 : val
+              setDelayMs(next)
+              const action = { type: 'TypeText' as const, data: text, delay_ms: next }
+              const temp: SystemEventAction = {
+                ...selectedElement,
+                data: { type: 'Clipboard', action }
+              }
+              updateElement(temp, selectedElementId)
+            }}
+          >
+            <NumberInputField />
+            <NumberInputStepper>
+              <NumberIncrementStepper />
+              <NumberDecrementStepper />
+            </NumberInputStepper>
+          </NumberInput>
+        </HStack>
+      )}
       {showEmojiPicker && (
         <Box ref={pickerRef} w="full">
           <Picker

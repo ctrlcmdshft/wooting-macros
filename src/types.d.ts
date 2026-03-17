@@ -39,6 +39,11 @@ export type MacroState = {
   updateMacroIcon: (newIcon: string) => void
   updateMacroType: (newType: MacroType) => void
   updateLoopCount: (count: number | null) => void
+  updateStartupDelay: (value: number | null) => void
+  updatePlaybackSpeed: (value: number | null) => void
+  updateAbortKey: (value: number | null) => void
+  updateSuppressTriggerKey: (value: boolean) => void
+  updateTriggerOnRelease: (value: boolean) => void
   updateTrigger: (newElement: TriggerEventType) => void
   updateAllowWhileOtherKeys: (value: boolean) => void
   onElementAdd: (newElement: ActionEventType) => void
@@ -64,6 +69,9 @@ export type SettingsState = {
   updateDefaultDelayVal: (value: string) => void
   updateAutoSelectElement: (value: boolean) => void
   updateTheme: (value: string) => void
+  updateRecordingHotkey: (value: number | undefined) => void
+  updateRecordMouseMovement: (value: boolean) => void
+  updateAlwaysOnTop: (value: boolean) => void
 }
 
 // Input Event Types
@@ -89,6 +97,8 @@ export type SystemEventAction = {
   data: SystemAction
 }
 export type MouseEventAction = { type: 'MouseEventAction'; data: MouseAction }
+export interface MousePathPoint { x: number; y: number; delta_ms: number }
+export type MousePathEventAction = { type: 'MousePathEventAction'; data: MousePathPoint[] }
 
 /** To be Extended */
 export type ActionEventType =
@@ -96,6 +106,7 @@ export type ActionEventType =
   | DelayEventAction
   | SystemEventAction
   | MouseEventAction
+  | MousePathEventAction
 
 // Main Data Structures
 export interface MacroData {
@@ -110,6 +121,9 @@ export interface ApplicationConfig {
   MinimizeAtLaunch: boolean
   Theme: string
   MinimizeToTray: boolean
+  RecordingHotkey?: number
+  RecordMouseMovement: boolean
+  AlwaysOnTop: boolean
 }
 
 export interface Macro {
@@ -120,6 +134,11 @@ export interface Macro {
   trigger: TriggerEventType
   sequence: ActionEventType[]
   loop_count?: number | null
+  startup_delay?: number | null
+  playback_speed?: number | null
+  abort_key?: number | null
+  suppress_trigger_key?: boolean
+  trigger_on_release?: boolean
 }
 
 export interface Collection {
@@ -127,6 +146,7 @@ export interface Collection {
   active: boolean
   macros: Macro[]
   icon: string
+  toggle_key?: number | null
 }
 
 declare global {
@@ -168,7 +188,7 @@ export type MousePressAction =
 
 export type MouseAction =
   | { type: 'Press'; data: MousePressAction }
-  | { type: 'Move'; x: number; y: number }
+  | { type: 'Scroll'; delta_x: number; delta_y: number }
 
 export type SystemAction =
   | { type: 'Open'; action: DirectoryAction }
@@ -187,7 +207,10 @@ export type ClipboardAction =
   | { type: 'GetClipboard' }
   | { type: 'Paste' }
   | { type: 'PasteUserDefinedString'; data: string }
+  | { type: 'TypeText'; data: string; delay_ms: number }
   | { type: 'Sarcasm' }
+  | { type: 'TextTransform'; variant: 'uppercase' | 'lowercase' | 'titlecase' | 'repeat'; count?: number }
+  | { type: 'TextEffect'; variant: 'sarcasm' | 'reverse' | 'leetspeak' }
 
 export type VolumeAction =
   | { type: 'LowerVolume' }

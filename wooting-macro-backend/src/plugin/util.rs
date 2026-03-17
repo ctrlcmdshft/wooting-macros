@@ -7,6 +7,45 @@ use tokio::sync::mpsc::UnboundedSender;
 /// Sends an event to the library to Execute on an OS level. This makes it easier to implement keypresses in custom code.
 pub fn direct_send_event(event_type: &rdev::EventType) -> Result<()> {
     trace!("Sending event: {:?}", event_type);
+
+    #[cfg(target_os = "windows")]
+    if let rdev::EventType::MouseMove { x, y } = event_type {
+        use std::mem;
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            SendInput, INPUT, INPUT_0, INPUT_MOUSE, MOUSEINPUT,
+        };
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN,
+            SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+        };
+        const MOUSEEVENTF_MOVE: u32 = 0x0001;
+        const MOUSEEVENTF_ABSOLUTE: u32 = 0x8000;
+        const MOUSEEVENTF_VIRTUALDESK: u32 = 0x4000;
+        let (vx, vy, vw, vh) = unsafe {(
+            GetSystemMetrics(SM_XVIRTUALSCREEN),
+            GetSystemMetrics(SM_YVIRTUALSCREEN),
+            GetSystemMetrics(SM_CXVIRTUALSCREEN),
+            GetSystemMetrics(SM_CYVIRTUALSCREEN),
+        )};
+        let norm_x = ((*x as i32 - vx) as f64 * 65535.0 / (vw - 1).max(1) as f64) as i32;
+        let norm_y = ((*y as i32 - vy) as f64 * 65535.0 / (vh - 1).max(1) as f64) as i32;
+        let input = INPUT {
+            r#type: INPUT_MOUSE,
+            Anonymous: INPUT_0 {
+                mi: MOUSEINPUT {
+                    dx: norm_x,
+                    dy: norm_y,
+                    mouseData: 0,
+                    dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        };
+        unsafe { SendInput(1, &input, mem::size_of::<INPUT>() as i32); }
+        return Ok(());
+    }
+
     rdev::simulate(event_type)?;
     Ok(())
 }

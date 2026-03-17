@@ -5892,7 +5892,7 @@ dependencies = [
 
 [[package]]
 name = "wooting-macro-backend"
-version = "1.1.1"
+version = "1.1.2"
 dependencies = [
  "anyhow",
  "copypasta",
@@ -5915,6 +5915,7 @@ dependencies = [
  "tokio",
  "tokio-serde",
  "url",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

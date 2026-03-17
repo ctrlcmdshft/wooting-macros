@@ -49,43 +49,49 @@ export class SystemEvent {
       description: "Pastes the specified text into a currently selected text input area."
     }
   }
-  static get Sarcasm(): SystemEventInfo {
+  static get TextTransform(): SystemEventInfo {
     return {
       type: 'Clipboard',
-      subtype: 'Sarcasm',
-      displayString: 'Sarcastify Text',
-      defaultData: {
-        type: 'Clipboard',
-        action: { type: 'Sarcasm' }
-      },
-      description: "Randomly capitalizes some letters in the currently highlighted text."
+      subtype: 'TextTransform',
+      displayString: 'Text Transform',
+      defaultData: { type: 'Clipboard', action: { type: 'TextTransform', variant: 'uppercase' } },
+      description: 'Transforms the selected text — uppercase, lowercase, title case, or repeat.'
     }
   }
-  static get IncreaseVolume(): SystemEventInfo {
+  static get TextEffect(): SystemEventInfo {
     return {
-      type: 'Volume',
-      subtype: 'IncreaseVolume',
-      displayString: 'Increase Volume',
-      defaultData: { type: 'Volume', action: { type: 'IncreaseVolume' } },
-      description: "Increases volume by an OS-specific amount."
+      type: 'Clipboard',
+      subtype: 'TextEffect',
+      displayString: 'Text Effect',
+      defaultData: { type: 'Clipboard', action: { type: 'TextEffect', variant: 'sarcasm' } },
+      description: 'Applies a fun effect to the selected text — sarcasm, reverse, or leetspeak.'
     }
   }
-  static get DecreaseVolume(): SystemEventInfo {
+  static get TypeText(): SystemEventInfo {
     return {
-      type: 'Volume',
-      subtype: 'LowerVolume',
-      displayString: 'Decrease Volume',
-      defaultData: { type: 'Volume', action: { type: 'LowerVolume' } },
-      description: "Decreases volume by an OS-specific amount."
+      type: 'Clipboard',
+      subtype: 'TypeText',
+      displayString: 'Type Text',
+      defaultData: { type: 'Clipboard', action: { type: 'TypeText', data: '', delay_ms: 30 } },
+      description: "Types text character by character — works where paste is blocked (games, login screens, etc.)."
     }
   }
-  static get ToggleMuteVolume(): SystemEventInfo {
+  static get Copy(): SystemEventInfo {
     return {
-      type: 'Volume',
-      subtype: 'ToggleMute',
-      displayString: 'Toggle Mute Volume',
-      defaultData: { type: 'Volume', action: { type: 'ToggleMute' } },
-      description: "Mutes or unmutes the system audio output."
+      type: 'Clipboard',
+      subtype: 'Copy',
+      displayString: 'Copy',
+      defaultData: { type: 'Clipboard', action: { type: 'Copy' } },
+      description: "Copies the currently selected text (Ctrl+C)."
+    }
+  }
+  static get Paste(): SystemEventInfo {
+    return {
+      type: 'Clipboard',
+      subtype: 'Paste',
+      displayString: 'Paste',
+      defaultData: { type: 'Clipboard', action: { type: 'Paste' } },
+      description: "Pastes the current clipboard content (Ctrl+V)."
     }
   }
 
@@ -93,11 +99,12 @@ export class SystemEvent {
     SystemEvent.OpenFile,
     SystemEvent.OpenFolder,
     SystemEvent.OpenWebsite,
+    SystemEvent.Copy,
+    SystemEvent.Paste,
     SystemEvent.Clipboard,
-    SystemEvent.Sarcasm,
-    SystemEvent.IncreaseVolume,
-    SystemEvent.DecreaseVolume,
-    SystemEvent.ToggleMuteVolume,
+    SystemEvent.TypeText,
+    SystemEvent.TextTransform,
+    SystemEvent.TextEffect,
   ]
 }
 

@@ -1,10 +1,11 @@
 #[cfg(not(debug_assertions))]
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::{thread, time};
 
 use anyhow::{bail, Error, Result};
+use tauri::Manager;
 use fastrand;
 #[cfg(not(debug_assertions))]
 use dirs;
@@ -73,6 +74,9 @@ pub enum ActionEventType {
     MouseEventAction {
         data: mouse::MouseAction,
     },
+    MousePathEventAction {
+        data: Vec<MousePathPoint>,
+    },
     //IDEA: Sound effects? Soundboards?
     //IDEA: Sending a message through online webapi (twitch)
     DelayEventAction {
@@ -80,6 +84,13 @@ pub enum ActionEventType {
         #[serde(default)]
         random_max: Option<u64>,
     },
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct MousePathPoint {
+    pub x: i32,
+    pub y: i32,
+    pub delta_ms: u64,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -99,6 +110,10 @@ pub enum TriggerEventType {
     //IDEA: computer temperature?
 }
 
+fn default_suppress_trigger_key() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 /// This is a macro struct. Includes all information a macro needs to run.
 pub struct Macro {
@@ -111,14 +126,40 @@ pub struct Macro {
     /// Optional: Maximum number of loop iterations for Toggle macros (None = infinite)
     #[serde(default)]
     pub loop_count: Option<u32>,
+    /// Delay in milliseconds before the sequence begins executing
+    #[serde(default)]
+    pub startup_delay: Option<u64>,
+    /// Speed multiplier for all delays (2.0 = 2x faster, 0.5 = half speed)
+    #[serde(default)]
+    pub playback_speed: Option<f64>,
+    /// HID key code that aborts macro execution mid-sequence
+    #[serde(default)]
+    pub abort_key: Option<u32>,
+    /// Whether the trigger key event is consumed (prevented from reaching other apps)
+    #[serde(default = "default_suppress_trigger_key")]
+    pub suppress_trigger_key: bool,
+    /// Fire the macro on key release instead of key press
+    #[serde(default)]
+    pub trigger_on_release: bool,
 }
 
 impl Macro {
     /// This function is used to execute a macro. It is called by the macro checker.
     /// It spawns async tasks to execute said events specifically.
     /// Make sure to expand this if you implement new action types.
-    async fn execute(&self, send_channel: UnboundedSender<rdev::EventType>) -> Result<()> {
+    async fn execute(&self, send_channel: UnboundedSender<rdev::EventType>, cancel: Arc<AtomicBool>) -> Result<()> {
+        let speed = self.playback_speed.unwrap_or(1.0).max(0.01);
+
+        if let Some(startup_ms) = self.startup_delay {
+            if startup_ms > 0 {
+                tokio::time::sleep(time::Duration::from_millis(startup_ms)).await;
+            }
+        }
+
         for action in &self.sequence {
+            if cancel.load(Ordering::Relaxed) {
+                break;
+            }
             match action {
                 ActionEventType::KeyPressEventAction { data } => match data.keytype {
                     key_press::KeyType::Down => {
@@ -137,8 +178,9 @@ impl Macro {
                         send_channel
                             .send(rdev::EventType::KeyPress(SCANCODE_TO_RDEV[&data.keypress]))?;
 
-                        // Wait the set delay by user
-                        tokio::time::sleep(time::Duration::from_millis(data.press_duration)).await;
+                        // Wait the set delay by user (scaled by playback speed)
+                        let scaled_duration = ((data.press_duration as f64) / speed) as u64;
+                        tokio::time::sleep(time::Duration::from_millis(scaled_duration)).await;
 
                         // Lift the key
                         send_channel.send(rdev::EventType::KeyRelease(
@@ -154,7 +196,8 @@ impl Macro {
                         Some(max) if *max > *data => fastrand::u64(*data..=*max),
                         _ => *data,
                     };
-                    tokio::time::sleep(time::Duration::from_millis(actual_delay)).await;
+                    let scaled_delay = ((actual_delay as f64) / speed) as u64;
+                    tokio::time::sleep(time::Duration::from_millis(scaled_delay)).await;
                 }
 
                 ActionEventType::SystemEventAction { data } => {
@@ -163,9 +206,47 @@ impl Macro {
                     task::spawn(async move { action_copy.execute(channel_copy).await });
                 }
                 ActionEventType::MouseEventAction { data } => {
-                    let action_copy = data.clone();
-                    let channel_copy = send_channel.clone();
-                    task::spawn(async move { action_copy.execute(channel_copy).await });
+                    match data {
+                        mouse::MouseAction::Press { data: mouse::MousePressAction::DownUp { .. } } => {
+                            let action_copy = data.clone();
+                            let channel_copy = send_channel.clone();
+                            task::spawn(async move { action_copy.execute(channel_copy).await });
+                        }
+                        _ => {
+                            data.execute(send_channel.clone()).await.ok();
+                        }
+                    }
+                }
+                ActionEventType::MousePathEventAction { data } => {
+                    // Before the first move, sleep proportionally to how far the cursor
+                    // currently is from the path start so the next action (click or key)
+                    // always fires after the cursor has settled at its destination.
+                    if let Some(first) = data.first() {
+                        #[cfg(target_os = "windows")]
+                        {
+                            use windows_sys::Win32::Foundation::POINT;
+                            use windows_sys::Win32::UI::WindowsAndMessaging::GetCursorPos;
+                            let mut pt = POINT { x: 0, y: 0 };
+                            unsafe { GetCursorPos(&mut pt); }
+                            let dx = (first.x - pt.x as i32) as f64;
+                            let dy = (first.y - pt.y as i32) as f64;
+                            let distance = (dx * dx + dy * dy).sqrt();
+                            // ~0.05 ms per pixel, clamped 5–150 ms
+                            let settle_ms = (distance * 0.05).clamp(5.0, 150.0) as u64;
+                            tokio::time::sleep(time::Duration::from_millis(settle_ms)).await;
+                        }
+                    }
+                    for point in data {
+                        if cancel.load(Ordering::Relaxed) {
+                            break;
+                        }
+                        let scaled_delta = ((point.delta_ms as f64) / speed) as u64;
+                        tokio::time::sleep(time::Duration::from_millis(scaled_delta)).await;
+                        send_channel.send(rdev::EventType::MouseMove {
+                            x: point.x as f64,
+                            y: point.y as f64,
+                        })?;
+                    }
                 }
             }
         }
@@ -182,6 +263,20 @@ type MacroTriggerLookup = HashMap<u32, Vec<Macro>>;
 /// Tracks active toggle macros by their name (used as unique identifier)
 type ActiveToggleMacros = Arc<Mutex<HashMap<String, tokio::task::JoinHandle<()>>>>;
 
+/// Maps HID key codes to lists of cancel flags for running macros (used for abort key support)
+type AbortRegistrations = Arc<std::sync::Mutex<HashMap<u32, Vec<Arc<AtomicBool>>>>>;
+
+/// Event emitted to the frontend during sequence recording.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(tag = "type")]
+pub enum RecordedEvent {
+    KeyPress { hid_code: u32, timestamp_ms: u64 },
+    KeyRelease { hid_code: u32, timestamp_ms: u64 },
+    ButtonPress { button_code: u32, timestamp_ms: u64 },
+    ButtonRelease { button_code: u32, timestamp_ms: u64 },
+    MouseMove { x: i32, y: i32, timestamp_ms: u64 },
+}
+
 /// State of the application in RAM (RWlock).
 #[derive(Debug)]
 pub struct MacroBackend {
@@ -190,6 +285,10 @@ pub struct MacroBackend {
     pub triggers: Arc<RwLock<MacroTriggerLookup>>,
     pub is_listening: Arc<AtomicBool>,
     pub active_toggles: ActiveToggleMacros,
+    pub is_recording: Arc<AtomicBool>,
+    pub app_handle: Arc<std::sync::Mutex<Option<tauri::AppHandle>>>,
+    pub last_move_ms: Arc<AtomicU64>,
+    pub abort_registrations: AbortRegistrations,
 }
 
 ///MacroData is the main data structure that contains all macro data.
@@ -206,6 +305,7 @@ impl Default for MacroData {
                 icon: ":smile:".to_string(),
                 macros: vec![],
                 active: true,
+                toggle_key: None,
             }],
         }
     }
@@ -273,26 +373,49 @@ pub struct Collection {
     pub icon: String,
     pub macros: Vec<Macro>,
     pub active: bool,
+    /// HID key code that toggles this collection on/off
+    #[serde(default)]
+    pub toggle_key: Option<u32>,
 }
 
 /// Executes a given macro (according to its type).
-///
-/// For Toggle macros, returns the task handle so it can be cancelled later.
-/// ! **UNIMPLEMENTED** - OnHold macro type is not yet implemented.
 async fn execute_macro(
     macros: Macro,
     channel: UnboundedSender<rdev::EventType>,
     active_toggles: ActiveToggleMacros,
+    abort_registrations: AbortRegistrations,
 ) {
     match macros.macro_type {
         MacroType::Single => {
             info!("\nEXECUTING A SINGLE MACRO: {:#?}", macros.name);
 
-            let cloned_channel = channel;
+            let cancel = Arc::new(AtomicBool::new(false));
+
+            // Register abort key if set
+            if let Some(abort_hid) = macros.abort_key {
+                if let Ok(mut regs) = abort_registrations.lock() {
+                    regs.entry(abort_hid).or_default().push(cancel.clone());
+                }
+            }
+
+            let abort_reg_clone = abort_registrations.clone();
+            let cancel_clone = cancel.clone();
 
             task::spawn(async move {
-                if let Err(error) = macros.execute(cloned_channel).await {
+                if let Err(error) = macros.execute(channel, cancel_clone.clone()).await {
                     error!("error executing macro: {}", error);
+                }
+                // Deregister abort key
+                if let Some(abort_hid) = macros.abort_key {
+                    if let Ok(mut regs) = abort_reg_clone.lock() {
+                        if let Some(vec) = regs.get_mut(&abort_hid) {
+                            let ptr = Arc::as_ptr(&cancel_clone) as usize;
+                            vec.retain(|f| Arc::as_ptr(f) as usize != ptr);
+                            if vec.is_empty() {
+                                regs.remove(&abort_hid);
+                            }
+                        }
+                    }
                 }
             });
         }
@@ -311,9 +434,20 @@ async fn execute_macro(
                 // Start the toggle macro
                 info!("Starting toggle macro: {}", macro_name);
                 let loop_count = macros.loop_count;
+                let cancel = Arc::new(AtomicBool::new(false));
+
+                if let Some(abort_hid) = macros.abort_key {
+                    if let Ok(mut regs) = abort_registrations.lock() {
+                        regs.entry(abort_hid).or_default().push(cancel.clone());
+                    }
+                }
+
                 let handle = task::spawn(async move {
                     let mut iteration = 0u32;
                     loop {
+                        if cancel.load(Ordering::Relaxed) {
+                            break;
+                        }
                         // Check if we've reached the loop limit
                         if let Some(max_loops) = loop_count {
                             if iteration >= max_loops {
@@ -322,7 +456,7 @@ async fn execute_macro(
                             }
                         }
 
-                        if let Err(error) = macros.execute(channel.clone()).await {
+                        if let Err(error) = macros.execute(channel.clone(), cancel.clone()).await {
                             error!("error executing toggle macro: {}", error);
                             break;
                         }
@@ -339,9 +473,49 @@ async fn execute_macro(
             }
         }
         MacroType::OnHold => {
-            //Postponed
-            //execute_macro_onhold(&macros).await;
-            warn!("OnHold macro type not yet implemented");
+            info!("\nONHOLD MACRO: {:#?}", macros.name);
+
+            // Key used to track this OnHold macro instance
+            let trigger_hid = match &macros.trigger {
+                TriggerEventType::KeyPressEvent { data, .. } => data.first().copied().unwrap_or(0),
+                TriggerEventType::MouseEvent { data } => {
+                    let code: u32 = data.into();
+                    code
+                }
+            };
+            let hold_key = format!("onhold_{}", trigger_hid);
+
+            let mut active_toggles_lock = active_toggles.lock().await;
+
+            // Don't start a second instance if already running
+            if active_toggles_lock.contains_key(&hold_key) {
+                return;
+            }
+
+            let cancel = Arc::new(AtomicBool::new(false));
+
+            if let Some(abort_hid) = macros.abort_key {
+                if let Ok(mut regs) = abort_registrations.lock() {
+                    regs.entry(abort_hid).or_default().push(cancel.clone());
+                }
+            }
+
+            let handle = task::spawn(async move {
+                loop {
+                    if cancel.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    if let Err(error) = macros.execute(channel.clone(), cancel.clone()).await {
+                        error!("error executing onhold macro: {}", error);
+                        break;
+                    }
+                    // Small gap between repetitions
+                    tokio::time::sleep(time::Duration::from_millis(10)).await;
+                }
+                info!("OnHold macro stopped");
+            });
+
+            active_toggles_lock.insert(hold_key, handle);
         }
     }
 }
@@ -377,14 +551,17 @@ fn check_macro_execution_efficiently(
     trigger_overview: Vec<Macro>,
     channel_sender: UnboundedSender<rdev::EventType>,
     active_toggles: ActiveToggleMacros,
+    abort_registrations: AbortRegistrations,
+    is_release: bool,
 ) -> bool {
-    let trigger_overview_print = trigger_overview.clone();
-
-    trace!("Got data: {:?}", trigger_overview_print);
+    trace!("Got data: {:?}", trigger_overview);
     trace!("Got keys: {:?}", pressed_events);
 
-    let mut output = false;
+    let mut should_suppress = false;
     for macros in &trigger_overview {
+        if macros.trigger_on_release != is_release {
+            continue;
+        }
         match &macros.trigger {
             TriggerEventType::KeyPressEvent { data, .. } => {
                 match data.len() {
@@ -395,14 +572,14 @@ fn check_macro_execution_efficiently(
                             let channel_clone_execute = channel_sender.clone();
                             let macro_clone_execute = macros.clone();
                             let active_toggles_clone = active_toggles.clone();
-
-                            // We don't need this here as there can't be a single key that's a modifier
-                            // plugin::util::lift_keys(data, &channel_clone_execute);
+                            let abort_regs_clone = abort_registrations.clone();
 
                             task::spawn(async move {
-                                execute_macro(macro_clone_execute, channel_clone_execute, active_toggles_clone).await;
+                                execute_macro(macro_clone_execute, channel_clone_execute, active_toggles_clone, abort_regs_clone).await;
                             });
-                            output = true;
+                            if macros.suppress_trigger_key {
+                                should_suppress = true;
+                            }
                         }
                     }
                     2..=4 => {
@@ -417,15 +594,18 @@ fn check_macro_execution_efficiently(
                             let channel_clone_execute = channel_sender.clone();
                             let macro_clone_execute = macros.clone();
                             let active_toggles_clone = active_toggles.clone();
+                            let abort_regs_clone = abort_registrations.clone();
 
                             // This releases any trigger keys that have been held to make macros more reliable when used with modifier hotkeys.
                             plugin::util::lift_keys(data, &channel_clone_execute)
                                 .unwrap_or_else(|err| error!("Error lifting keys: {}", err));
 
                             task::spawn(async move {
-                                execute_macro(macro_clone_execute, channel_clone_execute, active_toggles_clone).await;
+                                execute_macro(macro_clone_execute, channel_clone_execute, active_toggles_clone, abort_regs_clone).await;
                             });
-                            output = true;
+                            if macros.suppress_trigger_key {
+                                should_suppress = true;
+                            }
                         }
                     }
                     _ => (),
@@ -443,17 +623,20 @@ fn check_macro_execution_efficiently(
                     let channel_clone = channel_sender.clone();
                     let macro_clone = macros.clone();
                     let active_toggles_clone = active_toggles.clone();
+                    let abort_regs_clone = abort_registrations.clone();
 
                     task::spawn(async move {
-                        execute_macro(macro_clone, channel_clone, active_toggles_clone).await;
+                        execute_macro(macro_clone, channel_clone, active_toggles_clone, abort_regs_clone).await;
                     });
-                    output = true;
+                    if macros.suppress_trigger_key {
+                        should_suppress = true;
+                    }
                 }
             }
         }
     }
 
-    output
+    should_suppress
 }
 
 #[derive(Debug, Clone, Default)]
@@ -478,9 +661,29 @@ impl MacroBackend {
         Ok(())
     }
 
+    /// Stores the app handle so the recording hotkey can emit events to the frontend.
+    pub fn set_app_handle(&self, handle: tauri::AppHandle) {
+        if let Ok(mut guard) = self.app_handle.lock() {
+            *guard = Some(handle);
+        }
+    }
+
     /// Sets whether the backend should process keys that it listens to. Disabling disables the processing logic, but the app still grabs the keys.
     pub fn set_is_listening(&self, is_listening: bool) {
         self.is_listening.store(is_listening, Ordering::Relaxed);
+    }
+
+    /// Starts global sequence recording mode. Keyboard/mouse events are emitted to the frontend.
+    pub fn start_recording(&self) {
+        self.last_move_ms.store(0, Ordering::Relaxed);
+        self.is_recording.store(true, Ordering::Relaxed);
+        self.set_is_listening(false);
+    }
+
+    /// Stops global sequence recording mode and re-enables macro execution.
+    pub fn stop_recording(&self) {
+        self.is_recording.store(false, Ordering::Relaxed);
+        self.set_is_listening(true);
     }
     /// Sets the macros from the frontend to the files. This function is here to completely split the frontend off.
     pub async fn set_macros(&self, macros: MacroData) -> Result<()> {
@@ -507,6 +710,12 @@ impl MacroBackend {
         let inner_triggers = self.triggers.clone();
         let inner_is_listening = self.is_listening.clone();
         let inner_active_toggles = self.active_toggles.clone();
+        let inner_is_recording = self.is_recording.clone();
+        let inner_app_handle = self.app_handle.clone();
+        let inner_last_move_ms = self.last_move_ms.clone();
+        let inner_config = self.config.clone();
+        let inner_abort_registrations = self.abort_registrations.clone();
+        let inner_data = self.data.clone();
 
         // Spawn the channels
         let (schan_execute, rchan_execute) = tokio::sync::mpsc::unbounded_channel();
@@ -520,6 +729,77 @@ impl MacroBackend {
             let keys_pressed: KeysPressed = KeysPressed::default();
 
             rdev::grab(move |event: rdev::Event| {
+                // Check recording hotkey (works regardless of listening/recording state)
+                if let rdev::EventType::KeyPress(key) = event.event_type {
+                    let hid = SCANCODE_TO_HID.get(&key).copied().unwrap_or(0);
+                    let recording_hotkey = inner_config.blocking_read().recording_hotkey;
+                    if let Some(hotkey) = recording_hotkey {
+                        if hid == hotkey {
+                            let is_rec = inner_is_recording.load(Ordering::Relaxed);
+                            let new_state = !is_rec;
+                            if new_state {
+                                inner_last_move_ms.store(0, Ordering::Relaxed);
+                                inner_is_recording.store(true, Ordering::Relaxed);
+                                inner_is_listening.store(false, Ordering::Relaxed);
+                            } else {
+                                inner_is_recording.store(false, Ordering::Relaxed);
+                                inner_is_listening.store(true, Ordering::Relaxed);
+                            }
+                            if let Ok(guard) = inner_app_handle.lock() {
+                                if let Some(handle) = guard.as_ref() {
+                                    handle.emit_all("recording_state", new_state).ok();
+                                }
+                            }
+                            return None;
+                        }
+                    }
+                }
+
+                // Recording mode: emit events to frontend and pass through
+                if inner_is_recording.load(Ordering::Relaxed) {
+                    let timestamp_ms = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as u64;
+
+                    let maybe_event: Option<RecordedEvent> = match &event.event_type {
+                        rdev::EventType::KeyPress(key) => {
+                            SCANCODE_TO_HID.get(key).map(|&hid| RecordedEvent::KeyPress { hid_code: hid, timestamp_ms })
+                        }
+                        rdev::EventType::KeyRelease(key) => {
+                            SCANCODE_TO_HID.get(key).map(|&hid| RecordedEvent::KeyRelease { hid_code: hid, timestamp_ms })
+                        }
+                        rdev::EventType::ButtonPress(button) => {
+                            let code = BUTTON_TO_HID.get(button).copied().unwrap_or(0x101);
+                            Some(RecordedEvent::ButtonPress { button_code: code, timestamp_ms })
+                        }
+                        rdev::EventType::ButtonRelease(button) => {
+                            let code = BUTTON_TO_HID.get(button).copied().unwrap_or(0x101);
+                            Some(RecordedEvent::ButtonRelease { button_code: code, timestamp_ms })
+                        }
+                        rdev::EventType::MouseMove { x, y } => {
+                            if inner_config.blocking_read().record_mouse_movement {
+                                let last = inner_last_move_ms.load(Ordering::Relaxed);
+                                if timestamp_ms.saturating_sub(last) >= 8 {
+                                    inner_last_move_ms.store(timestamp_ms, Ordering::Relaxed);
+                                    Some(RecordedEvent::MouseMove { x: *x as i32, y: *y as i32, timestamp_ms })
+                                } else { None }
+                            } else { None }
+                        }
+                        _ => None,
+                    };
+
+                    if let Some(rec_event) = maybe_event {
+                        if let Ok(guard) = inner_app_handle.lock() {
+                            if let Some(handle) = guard.as_ref() {
+                                handle.emit_all("recording_event", rec_event).ok();
+                            }
+                        }
+                    }
+
+                    return Some(event); // always pass through during recording
+                }
+
                 if inner_is_listening.load(Ordering::Relaxed) {
                     match event.event_type {
                         rdev::EventType::KeyPress(key) => {
@@ -558,6 +838,29 @@ impl MacroBackend {
                                 .copied()
                                 .unwrap_or_default();
 
+                            // Check if this key is an abort key for any running macro
+                            if let Ok(regs) = inner_abort_registrations.lock() {
+                                if let Some(cancel_flags) = regs.get(&first_key) {
+                                    for flag in cancel_flags {
+                                        flag.store(true, Ordering::Relaxed);
+                                    }
+                                }
+                            }
+
+                            // Check collection toggle keys
+                            let toggle_idx = {
+                                let data_guard = inner_data.blocking_read();
+                                data_guard.data.iter().position(|col| col.toggle_key == Some(first_key))
+                            };
+                            if let Some(idx) = toggle_idx {
+                                if let Ok(app_guard) = inner_app_handle.lock() {
+                                    if let Some(handle) = app_guard.as_ref() {
+                                        handle.emit_all("collection_toggled", idx).ok();
+                                    }
+                                }
+                                return None;
+                            }
+
                             let trigger_list = inner_triggers.blocking_read().clone();
 
                             let check_these_macros = trigger_list
@@ -566,24 +869,31 @@ impl MacroBackend {
                                 .unwrap_or_default()
                                 .to_vec();
 
-                            // ? up the pressed keys here right away?
+                            // Suppress key press for trigger_on_release macros so
+                            // the default key action doesn't fire before the release.
+                            let has_release_trigger = check_these_macros
+                                .iter()
+                                .any(|m| m.trigger_on_release);
 
                             let should_grab = {
                                 if !check_these_macros.is_empty() {
                                     let channel_copy_send = schan_execute.clone();
                                     let active_toggles_copy = inner_active_toggles.clone();
+                                    let abort_regs_copy = inner_abort_registrations.clone();
                                     check_macro_execution_efficiently(
                                         pressed_keys_copy_converted,
                                         check_these_macros,
                                         channel_copy_send,
                                         active_toggles_copy,
+                                        abort_regs_copy,
+                                        false,
                                     )
                                 } else {
                                     false
                                 }
                             };
 
-                            if should_grab {
+                            if should_grab || has_release_trigger {
                                 None
                             } else {
                                 Some(event)
@@ -592,6 +902,30 @@ impl MacroBackend {
 
                         rdev::EventType::KeyRelease(key) => {
                             keys_pressed.0.blocking_write().retain(|x| *x != key);
+
+                            // Stop any OnHold macro triggered by this key
+                            let hid = SCANCODE_TO_HID.get(&key).copied().unwrap_or(0);
+                            let hold_key = format!("onhold_{}", hid);
+                            {
+                                let mut toggles = inner_active_toggles.blocking_lock();
+                                if let Some(handle) = toggles.remove(&hold_key) {
+                                    handle.abort();
+                                }
+                            }
+
+                            // Check trigger_on_release macros
+                            let trigger_list = inner_triggers.blocking_read().clone();
+                            let release_macros = trigger_list.get(&hid).cloned().unwrap_or_default();
+                            if !release_macros.is_empty() {
+                                check_macro_execution_efficiently(
+                                    vec![hid],
+                                    release_macros,
+                                    schan_execute.clone(),
+                                    inner_active_toggles.clone(),
+                                    inner_abort_registrations.clone(),
+                                    true,
+                                );
+                            }
 
                             debug!("Key state: {:?}", keys_pressed.0.blocking_read());
 
@@ -616,12 +950,15 @@ impl MacroBackend {
 
                             let channel_clone = schan_execute.clone();
                             let active_toggles_copy = inner_active_toggles.clone();
+                            let abort_regs_copy = inner_abort_registrations.clone();
 
                             let should_grab = check_macro_execution_efficiently(
                                 vec![converted_button_to_u32],
                                 check_these_macros,
                                 channel_clone,
                                 active_toggles_copy,
+                                abort_regs_copy,
+                                false,
                             );
 
                             // Left mouse button never gets consumed to allow users to control their PC.
@@ -665,6 +1002,10 @@ impl Default for MacroBackend {
             triggers: Arc::new(RwLock::from(triggers)),
             is_listening: Arc::new(AtomicBool::new(true)),
             active_toggles: Arc::new(Mutex::new(HashMap::new())),
+            is_recording: Arc::new(AtomicBool::new(false)),
+            app_handle: Arc::new(std::sync::Mutex::new(None)),
+            last_move_ms: Arc::new(AtomicU64::new(0)),
+            abort_registrations: Arc::new(std::sync::Mutex::new(HashMap::new())),
         }
     }
 }

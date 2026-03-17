@@ -42,13 +42,37 @@ export class MouseInput {
       displayString: 'Mouse 5'
     }
   }
+  static get Mouse6(): MouseInputInfo {
+    return {
+      webButtonVal: 5,
+      enumVal: MouseButton.Mouse6,
+      displayString: 'Mouse 6'
+    }
+  }
+  static get Mouse7(): MouseInputInfo {
+    return {
+      webButtonVal: 6,
+      enumVal: MouseButton.Mouse7,
+      displayString: 'Mouse 7'
+    }
+  }
+  static get Mouse8(): MouseInputInfo {
+    return {
+      webButtonVal: 7,
+      enumVal: MouseButton.Mouse8,
+      displayString: 'Mouse 8'
+    }
+  }
 
   static readonly all: MouseInputInfo[] = [
     MouseInput.Left,
     MouseInput.Middle,
     MouseInput.Right,
     MouseInput.Mouse4,
-    MouseInput.Mouse5
+    MouseInput.Mouse5,
+    MouseInput.Mouse6,
+    MouseInput.Mouse7,
+    MouseInput.Mouse8
   ]
 }
 

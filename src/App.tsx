@@ -44,6 +44,9 @@ function App() {
         if (event.key.toLowerCase() === 'f5') {
           event.preventDefault()
         }
+        if (event.key === 'F7') {
+          event.preventDefault()
+        }
       }
       document.addEventListener('keydown', handleKeyDownBlock)
 

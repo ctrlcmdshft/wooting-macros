@@ -73,7 +73,7 @@ export default function SortableItem({ id, element, recording }: Props) {
           return <UpArrowIcon />
         }
       case 'MouseEventAction':
-        if (element.data.type === 'Move') {
+        if (element.data.type === 'Scroll') {
           return <></>
         }
         if (element.data.data.type === 'DownUp') {

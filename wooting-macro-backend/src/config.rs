@@ -185,6 +185,9 @@ impl Default for ApplicationConfig {
             minimize_at_launch: false,
             theme: "light".to_string(),
             minimize_to_tray: true,
+            recording_hotkey: None,
+            record_mouse_movement: false,
+            always_on_top: false,
         }
     }
 }
@@ -219,6 +222,12 @@ pub struct ApplicationConfig {
     pub minimize_at_launch: bool,
     pub theme: String,
     pub minimize_to_tray: bool,
+    #[serde(default)]
+    pub recording_hotkey: Option<u32>,
+    #[serde(default)]
+    pub record_mouse_movement: bool,
+    #[serde(default)]
+    pub always_on_top: bool,
 }
 #[derive(Debug, serde::Serialize, serde::Deserialize, Clone, Default)]
 #[serde(rename_all = "PascalCase")]

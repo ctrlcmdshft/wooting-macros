@@ -41,7 +41,6 @@ export default function MousePressForm({
   const toast = useToast()
 
   useEffect(() => {
-    if (selectedElement.data.type !== 'Press') return
     const pressData = selectedElement.data.data
     const typeString: keyof typeof KeyType = pressData.type as keyof typeof KeyType
     setMousepressType(KeyType[typeString])
@@ -64,7 +63,6 @@ export default function MousePressForm({
   )
 
   const onInputBlur = useCallback(() => {
-    if (selectedElement.data.type !== 'Press') return
     if (selectedElement.data.data.type !== 'DownUp') return
 
     let duration = DefaultMouseDelay
@@ -107,7 +105,6 @@ export default function MousePressForm({
 
   const onMousepressTypeChange = useCallback(
     (newType: KeyType) => {
-      if (selectedElement.data.type !== 'Press') return
       setMousepressType(newType)
       const pressData = selectedElement.data.data
       let temp: MouseEventAction = { ...selectedElement }
@@ -149,7 +146,6 @@ export default function MousePressForm({
   )
 
   const onResetClick = useCallback(() => {
-    if (selectedElement.data.type !== 'Press') return
     if (selectedElement.data.data.type !== 'DownUp') return
 
     toast({
